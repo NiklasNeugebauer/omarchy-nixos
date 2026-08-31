@@ -95,7 +95,10 @@ in
       useUserPackages = true;
 
       users.${cfg.user} = homeArgs: {
-        home.stateVersion = config.system.stateVersion;
+        # home-manager's own release series, which is not the system's: this value picks
+        # which of its migration defaults apply, and tying it to system.stateVersion would
+        # move it for an unrelated reason.
+        home.stateVersion = "26.05";
 
         xdg.enable = true;
 
@@ -164,12 +167,11 @@ in
           '';
         };
 
+        # fzf only. Upstream's default/bash/init already runs `starship init bash` and
+        # `zoxide init bash` from the store copies, and it ships starship.toml as a shipped
+        # default — enabling home-manager's starship module would both duplicate that and
+        # fight it for ~/.config/starship.toml the moment anyone sets an option on it.
         programs.fzf = {
-          enable = true;
-          enableBashIntegration = true;
-        };
-
-        programs.starship = {
           enable = true;
           enableBashIntegration = true;
         };
