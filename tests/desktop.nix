@@ -18,60 +18,26 @@
   lib,
   pkgs,
   nixosModules,
-  homeManagerModule ? null,
+  homeManagerModule,
   ...
 }:
 
 pkgs.testers.runNixOSTest {
   name = "omarchy-desktop";
 
-  nodes.machine =
-    { ... }:
-    {
-      imports = [ nixosModules.omarchy ] ++ lib.optional (homeManagerModule != null) homeManagerModule;
-
-      omarchy = {
-        enable = true;
-        user = "omarchy";
-        # The point: get past the greeter without a human at the keyboard.
-        autoLogin = true;
-      };
-
-      users.users.omarchy = {
-        isNormalUser = lib.mkDefault true;
-        password = "omarchy";
-        extraGroups = [ "wheel" ];
-      };
-
-      virtualisation = {
-        graphics = true;
-        memorySize = 6144;
-        cores = 4;
-        diskSize = 8192;
-        # A virtio GPU *instead of* the default emulated card, not alongside it. Hyprland's
-        # renderer opens a DRM node, which the default card does not expose — and leaving
-        # both in place puts the compositor on one device while the screenshot is taken
-        # from the other, which looks exactly like a compositor that failed to draw.
-        qemu.options = [
-          "-vga none"
-          "-device virtio-gpu-pci"
-        ];
-      };
-
-      environment.sessionVariables = {
-        LIBGL_ALWAYS_SOFTWARE = "1";
-        WLR_RENDERER_ALLOW_SOFTWARE = "1";
-        # Hyprland refuses to start on a driver it does not recognise unless told the
-        # missing hardware is expected.
-        WLR_NO_HARDWARE_CURSORS = "1";
-      };
-
-      documentation.enable = lib.mkForce false;
-    };
+  nodes.machine = import ./machine.nix { inherit lib; } {
+    inherit nixosModules homeManagerModule;
+    graphical = true;
+    memorySize = 6144;
+    cores = 4;
+    diskSize = 8192;
+  };
 
   enableOCR = true;
 
   testScript = ''
+    import re
+
     machine.start()
     machine.wait_for_unit("graphical.target")
 
@@ -82,25 +48,15 @@ pkgs.testers.runNixOSTest {
     machine.screenshot("hyprland")
 
     # omarchy-launch-shell is what Hyprland's autostart runs; quickshell is the shell.
-    shell_up = machine.execute("pgrep -f quickshell")[0] == 0
-    print(f"quickshell running: {shell_up}")
-    if shell_up:
-        machine.sleep(30)
-        machine.screenshot("shell")
+    # Asserted, not reported: a quickshell bump that renames a QML module the shell imports
+    # kills it, omarchy-launch-shell gives up after five relaunches in a minute, and a
+    # printed False would leave a green test and no screenshot to look at — which is exactly
+    # the failure this check exists for.
+    machine.wait_until_succeeds("pgrep -f quickshell", timeout=180)
+    machine.sleep(30)
+    machine.screenshot("shell")
 
     print(f"OCR: {machine.get_screen_text_variants()!r}")
-
-    # --- the generated theme ----------------------------------------------------
-    # A theme name on its own proves nothing: the switcher writes that early and renders the
-    # per-application colour files afterwards, so a switcher that ran without a usable PATH
-    # leaves a named theme and no rendered files, and every application comes up unstyled
-    # while looking, from the outside, like theming worked.
-    theme_dir = "/home/omarchy/.local/state/omarchy/current/theme"
-    rendered = machine.succeed(f"ls {theme_dir}").split()
-    print(f"rendered theme files: {sorted(rendered)}")
-    for name in ("alacritty.toml", "btop.theme", "foot.ini", "hyprland.lua", "shell.toml"):
-        assert name in rendered, \
-            f"{name} was not rendered into {theme_dir}; it holds {sorted(rendered)}"
 
     # --- missing runtime tools --------------------------------------------------
     # Porting step 7 puts the tools the vendored commands shell out to in the system
@@ -124,11 +80,19 @@ pkgs.testers.runNixOSTest {
         "su -l omarchy -c 'journalctl --user --no-pager -b -o cat || true' || true"
     )
 
+    # Matched on the quoted command token rather than anywhere in the line: a substring
+    # test would let a genuinely missing tool through on any line that happens to contain
+    # the word "promise".
+    def is_allowed(line):
+        return any(
+            re.search(rf"""["'\s]{re.escape(tool)}["'\s:]""", line)
+            for tool in allowed_missing
+        )
+
     missing = [
         line
         for line in journal.splitlines()
-        if ("not found" in line or "Process failed to start" in line)
-        and not any(tool in line for tool in allowed_missing)
+        if ("not found" in line or "Process failed to start" in line) and not is_allowed(line)
     ]
     if missing:
         raise Exception(

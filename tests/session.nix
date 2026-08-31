@@ -13,7 +13,8 @@
 #   - the reimplemented commands behave (pkg-present, version, migrate)
 #   - the firewall opens 22/tcp and 53317 tcp+udp and nothing else
 #   - home-manager activation for the user succeeded, and left behind a seeded
-#     user-owned file, a store-symlinked shipped default, and an applied theme
+#     user-owned file, a store-symlinked shipped default, and a theme whose
+#     per-application colour files were rendered and not just named
 #   - a greeter unit exists and is wanted by graphical.target, and a Hyprland uwsm
 #     session desktop file is installed
 #
@@ -34,48 +35,16 @@
   nixosModules,
   # modules/omarchy/home.nix configures home-manager, so the home-manager NixOS module
   # has to be in the same evaluation.
-  homeManagerModule ? null,
+  homeManagerModule,
   ...
 }:
 
 pkgs.testers.runNixOSTest {
   name = "omarchy-session";
 
-  nodes.machine =
-    { ... }:
-    {
-      imports = [ nixosModules.omarchy ] ++ lib.optional (homeManagerModule != null) homeManagerModule;
-
-      omarchy = {
-        enable = true;
-        user = "omarchy";
-        autoLogin = true;
-      };
-
-      # The desktop's user. mkDefault throughout so a definition in
-      # modules/omarchy/system.nix wins instead of colliding. No password: the test
-      # driver runs as root, and `su -l` needs none from there.
-      users.users.omarchy = {
-        isNormalUser = lib.mkDefault true;
-        extraGroups = [ "wheel" ];
-      };
-
-      # Stop at multi-user: the greeter cannot render without a GPU, and this test only
-      # asserts that its unit is installed and wanted. mkForce because the
-      # display-manager module sets this to graphical.target.
-      systemd.defaultUnit = lib.mkForce "multi-user.target";
-
-      documentation.enable = lib.mkForce false;
-
-      virtualisation = {
-        graphics = false;
-        memorySize = 2048;
-        cores = 2;
-        diskSize = 4096;
-      };
-
-      system.stateVersion = lib.trivial.release;
-    };
+  nodes.machine = import ./machine.nix { inherit lib; } {
+    inherit nixosModules homeManagerModule;
+  };
 
   testScript = ''
     import re
@@ -195,12 +164,21 @@ pkgs.testers.runNixOSTest {
     ).strip()
     assert alacritty.startswith("/nix/store/"), \
         f"a shipped default was copied instead of linked: {alacritty!r}"
-    # The theme switcher ran headlessly during activation; without it every generated
-    # theme file is missing and the desktop comes up unstyled.
+    # The theme switcher ran headlessly during activation. A theme name proves nothing on
+    # its own: the switcher writes that first and renders the per-application colour files
+    # afterwards, so one that ran without a usable PATH leaves a named theme and no
+    # rendered files, and every application comes up unstyled while looking, from the
+    # outside, like theming worked.
     theme = machine.succeed(
         "cat /home/omarchy/.local/state/omarchy/current/theme.name"
     ).strip()
     assert theme, "no theme was applied during home-manager activation"
+
+    theme_dir = "/home/omarchy/.local/state/omarchy/current/theme"
+    rendered = machine.succeed(f"ls {theme_dir}").split()
+    for name in ("alacritty.toml", "btop.theme", "foot.ini", "hyprland.lua", "shell.toml"):
+        assert name in rendered, \
+            f"{name} was not rendered into {theme_dir}; it holds {sorted(rendered)}"
 
     # --- the greeter and the session desktop file -------------------------------
     # The sddm module builds display-manager.service but leaves its WantedBy empty, so

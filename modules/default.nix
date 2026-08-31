@@ -35,6 +35,12 @@ in
       description = ''
         The vendored upstream tree. `$OMARCHY_PATH` resolves into
         `''${package}/share/omarchy`, and every `omarchy-*` command comes from here.
+
+        Overriding this is supported, but `modules/omarchy/home.nix` reads the package's own
+        `src` with `builtins.readDir` to learn which config directories upstream ships. That
+        is free when `src` is an already-fetched flake input, and becomes an
+        import-from-derivation — which `nix flake check --no-build` refuses — if it is
+        replaced by something that has to be built or fetched at evaluation time.
       '';
     };
 

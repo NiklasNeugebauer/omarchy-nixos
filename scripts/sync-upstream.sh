@@ -46,7 +46,13 @@ classify() {
   printf '=== %s ===\n%s\n\n' "$label" "$matched"
 }
 
-classify "vendored — ships as-is, no action" \
+# "vendored" is not the same as "no action". These trees ship unmodified, but the modules
+# reach into them by path and the two command tables name individual files in bin/, so a
+# rename here is a repo edit even though the tree itself needs no translation. The package
+# build fails on the paths and commands it knows about; this bucket is where you look for the
+# ones it cannot know about — a new config/<app>/ that an application writes to, a new
+# default/systemd/user unit, a new bin/omarchy-* that shells out to something unpackaged.
+classify "vendored — ships as-is, but read it: this repo references these trees by path" \
   '^(bin|default|shell|themes|config|applications)/|^(version|logo\.[a-z]+|icon\.[a-z]+)$'
 classify "package — update packages.nix and the inventory" \
   '^install/omarchy-.*\.packages$'
@@ -57,7 +63,7 @@ classify "ignore — not shipped, or no NixOS meaning" \
 
 # Everything the four buckets above did not claim. `version` alone would otherwise land
 # here on every single release, and a warning that always fires is a warning nobody reads.
-unclassified=$(grep -vE '^(bin|default|shell|themes|config|applications|test|manual|plans|docs|agents|migrations)/|^install/|^etc/|^(version|logo\.[a-z]+|icon\.[a-z]+|LICENSE)$|^(README|CLAUDE|AGENTS)\.md$' <<<"$changed" || true)
+unclassified=$(grep -vE '^(bin|default|shell|themes|config|applications|test|manual|plans|docs|agents|migrations)/|^install/(config|hardware|login|post-install|provisioning|helpers|user)/|^install/[^/]+$|^etc/|^(version|logo\.[a-z]+|icon\.[a-z]+|LICENSE)$|^(README|CLAUDE|AGENTS)\.md$' <<<"$changed" || true)
 if [[ -n $unclassified ]]; then
   printf '=== UNCLASSIFIED — decide before committing ===\n%s\n\n' "$unclassified"
 fi

@@ -20,7 +20,9 @@ install/ migrations/` and `version` into `$out/share/omarchy`, the layout upstre
 to find at `$OMARCHY_PATH`. `test/ manual/ plans/ agents/ docs/` are left out — no upstream
 package ships them either.
 
-*Verified by:* the build fails if a directory upstream renames goes missing.
+*Verified by:* the build fails if one of the copied directories goes missing, and separately
+if any path a module references does — those are listed in `pkgs/omarchy/upstream-paths.nix`,
+which has to gain an entry whenever a module starts naming a new one.
 
 ### 2. Stub the Arch-machinery commands
 
@@ -65,9 +67,9 @@ exist — `config/xournalpp/settings.xml` points at `/usr/share/xournalpp/resour
 Upstream uses that literal both as the fallback for `$OMARCHY_PATH` and as the value its
 "am I running from a dev checkout?" comparisons test against. Pointing it at the derivation
 makes the store path *the packaged location*, so those comparisons stay true and nothing at
-runtime has to be told where the tree lives. `/etc/omarchy.conf` is therefore never written;
-the module explicitly disables it, because upstream reads its presence as a dev link and a
-stale one would outrank the built system.
+runtime has to be told where the tree lives. `/etc/omarchy.conf` is therefore never
+written. Upstream reads its presence as a dev link, so a hand-written one would outrank the
+built system — which is why `omarchy dev link`, the command that writes it, is stubbed.
 
 *Verified by:* the build fails if the literal survives anywhere outside markdown.
 

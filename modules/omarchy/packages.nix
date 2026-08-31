@@ -123,7 +123,6 @@ let
     gtk4-layer-shell
     egl-wayland
     webp-pixbuf-loader
-    qt6.qtimageformats
   ];
 
   media = with pkgs; [

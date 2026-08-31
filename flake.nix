@@ -32,6 +32,10 @@
       ...
     }:
     let
+      # aarch64 gets the package and the devShell only. The hosts, the VM tests and the disk
+      # layout are all x86_64 below, and nothing on aarch64 has ever been built — `nix flake
+      # check` says so on every run ("omitted these incompatible systems"). It is here
+      # because the vendored tree is architecture-independent, not because it is supported.
       systems = [
         "x86_64-linux"
         "aarch64-linux"

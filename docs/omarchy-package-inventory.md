@@ -22,7 +22,7 @@ Attributes were confirmed against the nixpkgs revision `flake.lock` pins. Where 
 | `hyprland-preview-share-picker` | `hyprland-preview-share-picker` | ported | |
 | `hyprpicker` | `hyprpicker` | ported | |
 | `hyprsunset` | `hyprsunset` | ported | |
-| `quickshell` | `quickshell` | ported | Owned by `modules/omarchy/shell.nix`. |
+| `quickshell` | `quickshell` | substituted | Overridden in `pkgs/default.nix` to add the WebP image plugin inside its own wrapper; installed by `modules/omarchy/shell.nix`. |
 | `uwsm` | `uwsm` | substituted | `programs.uwsm`; the session entry point, not a plain package. |
 | `sddm` | `kdePackages.sddm` | substituted | Top-level `sddm` is gone; set through `services.displayManager.sddm`. |
 | `xdg-desktop-portal-gtk` | `xdg-desktop-portal-gtk` | substituted | `xdg.portal.extraPortals`. |
@@ -34,8 +34,8 @@ Attributes were confirmed against the nixpkgs revision `flake.lock` pins. Where 
 | `gvfs-mtp`, `gvfs-nfs`, `gvfs-smb` | `gvfs` | substituted | One gvfs build in nixpkgs covers all backends; enabled via `services.gvfs`. |
 | `udiskie` | `udiskie` | ported | Autostarted from the session, as upstream does. |
 | `power-profiles-daemon` | `power-profiles-daemon` | substituted | `services.power-profiles-daemon`. |
-| `qt6-imageformats` | `qt6.qtimageformats` | substituted | Namespaced under the Qt 6 set. |
-| `qt6-wayland` | `qt6.qtwayland` | substituted | Namespaced under the Qt 6 set. |
+| `qt6-imageformats` | `qt6.qtimageformats` | substituted | Added to quickshell's `buildInputs` in `pkgs/default.nix`, not to the system profile: wrapQtAppsHook pins the plugin path to quickshell's own closure. |
+| `qt6-wayland` | `qt6.qtwayland` | ported | Comes in through quickshell's own `buildInputs`; nothing here installs it separately. |
 | `gtk4-layer-shell` | `gtk4-layer-shell` | ported | |
 | `egl-wayland` | `egl-wayland` | ported | |
 | `gnome-themes-extra` | `gnome-themes-extra` | ported | |

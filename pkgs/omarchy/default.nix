@@ -20,6 +20,27 @@
 let
   version = lib.fileContents "${src}/version";
   archOnly = import ./nixos-commands.nix;
+  requiredPaths = import ./upstream-paths.nix;
+
+  # The PAM services the lock screen asks for, as string literals in its QML. Getting these
+  # wrong is the worst failure in the repo: NixOS creates services under the old names, the
+  # shell requests ones that do not exist, and the lock screen cannot authenticate — which
+  # you discover while locked out. Declared here so a rename fails the build instead.
+  lockPamServices = [
+    "omarchy-lock-password"
+    "omarchy-lock-fingerprint"
+  ];
+
+  # Commands that mention Arch tooling but are deliberately left alone. Each ships as
+  # upstream wrote it and degrades by printing a raw error from a command that is not there,
+  # which for a diagnostic or an optional installer is better than refusing to run at all.
+  archAllowlist = [
+    "omarchy-debug" # collects diagnostics; the pacman section comes out empty
+    "omarchy-upload-log" # ditto
+    "omarchy-install-gaming-retroarch" # optional installer, fails at the pkg-add stub
+    "omarchy-remove-launcher-entry" # only its cleanup path touches pacman
+    "omarchy-setup-security-fingerprint" # fprintd setup, guarded on the binary being present
+  ];
 
   # A stub that reports the NixOS equivalent instead of failing inside pacman. The summary
   # header is what the router lists it under, so it has to be there.
@@ -61,13 +82,9 @@ stdenvNoCC.mkDerivation {
         fi
         # Commands upstream hides are internal helpers other commands call. Carrying the
         # flag over keeps them out of `omarchy commands`, which would otherwise advertise a
-        # list of things that cannot work. Written as a full conditional: a bare `&&` whose
-        # left side fails takes the whole builder down under set -e.
-        if grep -q '^# omarchy:hidden=true' bin/${name}; then
-          hidden=1
-        else
-          hidden=0
-        fi
+        # list of things that cannot work.
+        hidden=0
+        grep -q '^# omarchy:hidden=true' bin/${name} && hidden=1
         install -m755 ${builtins.toFile "${name}.stub" (stubFor name hint)} bin/${name}
         if (( hidden )); then
           sed -i '/^# omarchy:summary=/a # omarchy:hidden=true' bin/${name}
@@ -118,6 +135,46 @@ stdenvNoCC.mkDerivation {
       echo "$leftovers" >&2
       exit 1
     fi
+
+    # Everything a module names by path. See upstream-paths.nix for why this is not optional.
+    missing=()
+    for path in ${lib.escapeShellArgs requiredPaths}; do
+      [[ -e $path ]] || missing+=("$path")
+    done
+    if (( ''${#missing[@]} )); then
+      echo "porting-steps: upstream no longer has paths this repo references:" >&2
+      printf '  %s\n' "''${missing[@]}" >&2
+      echo "Update the reference, then update pkgs/omarchy/upstream-paths.nix." >&2
+      exit 1
+    fi
+
+    # The lock screen's PAM service names, read out of the QML that asks for them.
+    for service in ${lib.escapeShellArgs lockPamServices}; do
+      grep -rqF "config: \"$service\"" shell/plugins/lock/ || {
+        echo "porting-steps: no plugin asks for PAM service '$service' any more." >&2
+        echo "Reconcile shell/plugins/lock/ with security.pam.services in modules/omarchy/shell.nix." >&2
+        exit 1
+      }
+    done
+
+    # A command that still drives Arch machinery. Both tables above catch a *listed* command
+    # disappearing; this catches the other direction — a new upstream command reaching for
+    # pacman, the AUR, Limine or Snapper and shipping as live Arch code, which no test would
+    # notice because it only fails when a user runs it.
+    handled=$(printf '%s\n' ${lib.escapeShellArgs (lib.attrNames archOnly)} \
+      ${lib.escapeShellArgs archAllowlist} | sort -u)
+    for replacement in ${./commands}/*; do handled+=$'\n'$(basename "$replacement"); done
+    offenders=$(comm -23 \
+      <(grep -rlE '\b(pacman|yay|paru|pacstrap|makepkg|expac|checkupdates|limine|snapper|mkinitcpio)\b' bin/ \
+        | xargs -r -n1 basename | sort -u) \
+      <(sort -u <<<"$handled"))
+    if [[ -n $offenders ]]; then
+      echo "porting-steps: these commands drive Arch machinery and are neither stubbed nor" >&2
+      echo "reimplemented. Add each to nixos-commands.nix, to commands/, or to the" >&2
+      echo "archAllowlist in default.nix with a reason:" >&2
+      printf '  %s\n' $offenders >&2
+      exit 1
+    fi
   '';
 
   installPhase = ''
@@ -141,14 +198,26 @@ stdenvNoCC.mkDerivation {
     # Package-owned system files, at the paths NixOS looks for them rather than the
     # /usr/lib and /usr/share paths upstream's PKGBUILD uses.
     #
-    # systemd user units, picked up via `systemd.packages`. omarchy-migrate-notify is
-    # deliberately not shipped: it exists to nag about pending migrations, and a system
-    # rebuilt from its flake has none.
+    # systemd user units, picked up via `systemd.packages`.
+    # nullglob, because an unmatched glob would otherwise symlink a literal "*.service" and
+    # exit 0: systemd.packages would then find nothing, and shell.nix's five drop-ins would
+    # silently apply to units that do not exist.
     mkdir -p "$out/lib/systemd/user"
-    for unit in "$share"/default/systemd/user/*.service; do
+    shopt -s nullglob
+    units=("$share"/default/systemd/user/*.service)
+    shopt -u nullglob
+    if (( ''${#units[@]} < 5 )); then
+      echo "porting-steps: expected upstream user units, found ''${#units[@]}." >&2
+      echo "Reconcile default/systemd/user/ with systemd.user.services in modules/omarchy/shell.nix." >&2
+      exit 1
+    fi
+    for unit in "''${units[@]}"; do
       name=$(basename "$unit")
-      [[ $name == omarchy-migrate-notify.service ]] && continue
-      ln -s "$unit" "$out/lib/systemd/user/$name"
+      # omarchy-migrate-notify exists to nag about pending migrations, and a system rebuilt
+      # from its flake has none.
+      if [[ $name != omarchy-migrate-notify.service ]]; then
+        ln -s "$unit" "$out/lib/systemd/user/$name"
+      fi
     done
 
     # The SDDM and Plymouth themes, so services.displayManager.sddm.theme and

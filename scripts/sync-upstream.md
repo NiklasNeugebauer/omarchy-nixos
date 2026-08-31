@@ -14,38 +14,30 @@ commit (or one PR), never mixed with a nixpkgs bump.
 
 ## 2. Classify every changed path
 
-Four buckets, and every changed file lands in exactly one:
-
-| Changed path | Bucket | What to do |
-| --- | --- | --- |
-| `bin/`, `default/`, `shell/`, `themes/`, `config/`, `applications/` | **vendored** | Nothing. It ships as-is. |
-| `install/omarchy-*.packages` | **package** | Translate the diff into `modules/omarchy/packages.nix` and update `docs/omarchy-package-inventory.md`. |
-| `install/config/`, `install/hardware/`, `install/login/`, `etc/` | **script** | Translate into a `modules/omarchy/*.nix` option. These are never executed. |
-| `test/`, `manual/`, `plans/`, `docs/`, `agents/`, `migrations/` | **ignore** | Not shipped, or has no NixOS meaning. |
-
-Two things to watch for specifically, because they are how upstream breaks this port:
+`./scripts/sync-upstream.sh` does the bump and prints every changed path in its bucket, so
+there is no table here to fall out of step with the script that implements it. Read its
+output, and note two things it cannot infer:
 
 - A **new command that manages packages, the bootloader or snapshots** needs a row in
-  `pkgs/omarchy/nixos-commands.nix`. Nothing detects this automatically.
-- A **command in `nixos-commands.nix` or `pkgs/omarchy/commands/` that upstream deleted or
-  renamed** fails the build with a `porting-steps:` message naming the file. That is the
-  check working, not a bug — remove the stale entry.
+  `pkgs/omarchy/nixos-commands.nix`. The package build now catches this — it fails naming any
+  `bin/` command that reaches for pacman, the AUR, Limine or Snapper and is in neither table
+  nor the allowlist — but the build cannot decide *which* of the three it belongs in.
+- The **vendored** bucket says "ships as-is", and that is true of the tree, not of this repo.
+  The modules reach into `default/` and `config/` by path. A new `config/<app>/` that the
+  application writes to has to go in `home.nix`'s `seeded` list, or every write to it fails
+  silently; see porting step 9.
 
 ## 3. Re-read the porting steps
 
-Walk `docs/porting-steps.md`. Steps 1–6 verify themselves during the build. Steps 7–10 are
-marked **check by hand**; do that now, not after the VM boots.
+Walk `docs/porting-steps.md`. Most steps verify themselves during the build; the ones marked
+**check by hand** do not. Do those now, not after the VM boots.
 
 ## 4. Build and smoke test
 
-    nix flake check
-    nix build .#omarchy
-    nix build .#nixosConfigurations.omarchy-vm.config.system.build.vm
-    ./result/bin/run-omarchy-vm-vm
-
-Then the hardware checklist in `docs/progress.md`. A green `nix flake check` is not a
-verified desktop: it
-cannot see the bar, the menu or the lock screen.
+The procedure is the one in `AGENTS.md` under *Making a change* — it is not repeated here so
+that there is one copy of it. In short: `nix flake check`, then
+`nix build .#desktop-screenshots`, then the checklist in `docs/progress.md` if the session
+changed.
 
 ## 5. Write the sync report
 

@@ -5,23 +5,25 @@ Upstream detects hardware at install time and runs a matching script from
 hardware in `hosts/<name>/hardware.nix`, and guessing at build time would be guessing about a
 machine the build has never seen.
 
-This file is the map from upstream's per-vendor scripts to the NixOS option that replaces
-each one, so a new machine can be set up without reading upstream's shell.
+This file maps upstream's per-vendor *scripts* to the NixOS option that replaces each one, so
+a new machine can be set up without reading upstream's shell. Package names are not repeated
+here — `docs/omarchy-package-inventory.md` owns the upstream-package-to-attribute mapping,
+including the driver packages, and a second copy of it would drift.
 
-| Upstream | NixOS equivalent |
+| Upstream script or concern | NixOS equivalent |
 | --- | --- |
-| `install/hardware/nvidia.sh`, `nvidia-*-dkms` | `hardware.nvidia`, `hardware.nvidia.open`, `services.xserver.videoDrivers = [ "nvidia" ]` |
-| `install/hardware/intel.sh`, `vulkan-intel`, `intel-media-driver`, `libvpl` | `hardware.graphics.extraPackages` |
-| `vulkan-radeon`, AMD | `hardware.graphics.extraPackages = [ pkgs.amdvlk ]`, or leave it to Mesa |
-| `asusctl`, `supergfxctl`, `install/hardware/asus/` | `services.asusd.enable` |
-| `install/hardware/framework/`, `qmk-hid` | `hardware.framework.*` from `nixos-hardware` |
-| `intel-lpmd`, `thermald` | `services.thermald.enable`; `intel-lpmd` is not in nixpkgs |
-| `broadcom-wl`, `yt6801-dkms`, `tuxedo-drivers`, `macbook12-spi-driver` | `boot.extraModulePackages` — each needs its own derivation |
-| T2 MacBook stack (`linux-t2`, `apple-bcm-firmware`, `t2fanrd`) | not packaged; a T2 Mac needs a kernel fork this repo does not carry |
+| `install/hardware/nvidia.sh` | `hardware.nvidia`, `hardware.nvidia.open`, `services.xserver.videoDrivers = [ "nvidia" ]` |
+| `install/hardware/intel.sh` | `hardware.graphics.extraPackages` |
+| AMD graphics | `hardware.graphics.extraPackages = [ pkgs.amdvlk ]`, or leave it to Mesa |
+| `install/hardware/asus/` | `services.asusd.enable` |
+| `install/hardware/framework/` | `hardware.framework.*` from `nixos-hardware` |
+| thermal management | `services.thermald.enable`; `intel-lpmd` is not in nixpkgs |
+| out-of-tree wireless and laptop drivers | `boot.extraModulePackages` — each needs its own derivation |
+| T2 MacBook support | not packaged; a T2 Mac needs a kernel fork this repo does not carry |
 | `install/hardware/microcode.sh` | `hardware.cpu.{intel,amd}.updateMicrocode` |
 | `install/hardware/set-wireless-regdom.sh` | `hardware.wirelessRegulatoryDatabase` — the kernel picks the domain from the AP, so upstream's timezone-derived guess is unnecessary |
-| `bolt` (Thunderbolt authorisation) | `services.hardware.bolt.enable` |
-| `asdcontrol` (Apple Studio Display brightness) | not packaged; `ddcutil` covers normal monitors |
+| Thunderbolt authorisation | `services.hardware.bolt.enable` |
+| Apple Studio Display brightness | not packaged; `ddcutil` covers normal monitors |
 | `install/hardware/speaker-tuning.sh`, `default/audio/tunings/` | stays a runtime feature; see `docs/divergences.md` |
 | fingerprint (`omarchy setup security fingerprint`) | `services.fprintd.enable`, which also arms the shell's `omarchy-lock-fingerprint` PAM service |
 

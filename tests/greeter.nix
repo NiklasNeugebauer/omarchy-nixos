@@ -14,48 +14,21 @@
   lib,
   pkgs,
   nixosModules,
-  homeManagerModule ? null,
+  homeManagerModule,
   ...
 }:
 
 pkgs.testers.runNixOSTest {
   name = "omarchy-greeter";
 
-  nodes.machine =
-    { ... }:
-    {
-      imports = [ nixosModules.omarchy ] ++ lib.optional (homeManagerModule != null) homeManagerModule;
-
-      omarchy = {
-        enable = true;
-        user = "omarchy";
-        autoLogin = false;
-      };
-
-      users.users.omarchy = {
-        isNormalUser = lib.mkDefault true;
-        password = "omarchy";
-        extraGroups = [ "wheel" ];
-      };
-
-      # The point of this test, unlike tests/session.nix.
-      virtualisation = {
-        graphics = true;
-        memorySize = 4096;
-        cores = 4;
-        diskSize = 8192;
-      };
-
-      # No GPU to pass through, so Mesa's software rasteriser has to serve both the greeter's
-      # compositor and Hyprland. Naming it explicitly avoids a fallback to a driver that is
-      # not there and a blank screen with nothing in the journal.
-      environment.sessionVariables = {
-        LIBGL_ALWAYS_SOFTWARE = "1";
-        WLR_RENDERER_ALLOW_SOFTWARE = "1";
-      };
-
-      documentation.enable = lib.mkForce false;
-    };
+  nodes.machine = import ./machine.nix { inherit lib; } {
+    inherit nixosModules homeManagerModule;
+    graphical = true;
+    autoLogin = false;
+    memorySize = 4096;
+    cores = 4;
+    diskSize = 8192;
+  };
 
   enableOCR = true;
 

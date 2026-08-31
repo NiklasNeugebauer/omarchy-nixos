@@ -34,29 +34,9 @@ re-verify on every upstream bump; it is deliberately short and must stay short.
 
 ## Phases
 
-Each phase ends with `nix flake check` green and, from phase 3 on, a VM build.
-
-- **Phase 0 — scaffolding.** Flake with pinned inputs (`nixpkgs`, `home-manager`, `disko`,
-  `omarchy` as `flake = false`), repo layout, CI, docs skeleton, license/attribution.
-- **Phase 1 — the omarchy package.** Vendor the upstream tree into the store: patch shebangs,
-  expose `bin/omarchy-*` on `PATH`, keep the tree layout upstream expects. No behaviour
-  changes beyond what `docs/porting-steps.md` records.
-- **Phase 2 — base system.** `modules/omarchy/system.nix`, `network.nix`, `audio.nix`,
-  `printing.nix`: the `etc/**` drop-ins and `install/config/*.sh` translated to options.
-  Firewall: deny in, allow out, 22/tcp + 53317 tcp+udp open.
-- **Phase 3 — session.** Hyprland (Lua config, 0.56+), UWSM, SDDM with the omarchy theme,
-  portals, polkit. VM boots to a session.
-- **Phase 4 — the shell.** Quickshell at the version upstream targets; the bar, menu, OSD,
-  notifications, lock screen and polkit agent all come from the vendored `shell/` tree.
-- **Phase 5 — `$HOME`.** home-manager module rendering `config/**` into `~/.config`, plus the
-  bits `omarchy-provision-user` did that stay meaningful declaratively.
-- **Phase 6 — packages.** Translate both `.packages` lists; log every entry in
-  `docs/omarchy-package-inventory.md` as ported / substituted / dropped.
-- **Phase 7 — theming.** `omarchy theme set` works end to end against the vendored themes;
-  GTK/Qt/terminal/shell all follow.
-- **Phase 8 — disks and hardware.** disko LUKS2 + btrfs subvolumes, generic laptop host.
-- **Phase 9 — tests.** `nix flake check`, a NixOS VM test asserting the session comes up, and
-  the hardware checklist in `docs/progress.md` run by hand once on hardware.
+The work was organised into ten phases, and `docs/progress.md` carries them with their state.
+They are not repeated here: a phase list in two files is a second progress tracker, and the
+two disagree the moment one is updated.
 
 ## Non-goals
 

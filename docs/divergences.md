@@ -31,9 +31,11 @@ package updates can improve the defaults without rewriting your `~/.config/hypr`
 
 - **Shipped defaults** are store symlinks. They are always the shipped default, which makes
   `omarchy-reinstall-configs` redundant rather than broken.
-- **User-owned files** — `config/hypr/`, `config/omarchy/`, `config/git/config`, and the
-  Hyprland runtime toggles — are copied once if absent and then never touched. A read-only
-  store symlink would break the workflow upstream documents.
+- **Seeded files** are copied once if absent and then never touched. Two things land here: a
+  file upstream invites the user to edit, and a file the *application* rewrites — an Electron
+  profile, or a TUI that saves settings on exit. A store symlink breaks both, silently in the
+  second case. The list is `seeded` in `modules/omarchy/home.nix`; it is not repeated here,
+  because a copy of it in prose would drift out of date without anything noticing.
 
 The consequence is real and worth stating plainly: after an upstream bump, an improvement to
 a *user-owned* default does not reach a user who already has that file. That is exactly the
@@ -43,8 +45,8 @@ otherwise fully declarative it is a surprise, so it is written down here.
 ## Runtime tools live in the system profile
 
 Porting step 7 puts the tools the vendored `omarchy-*` commands shell out to in
-`environment.systemPackages` rather than wrapping each of the 441 commands, because wrapping
-would break the CLI router's own sibling discovery. The consequence is that a tool nobody
+`environment.systemPackages` rather than wrapping each command, because wrapping would break
+the CLI router's own sibling discovery. The consequence is that a tool nobody
 listed fails at runtime, not at build time — and the places that bit are worth naming, because
 they are the shape of the next one:
 

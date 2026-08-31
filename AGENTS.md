@@ -17,6 +17,12 @@ one place and is linked from here — do not restate it, or the two copies will 
 
 Read `omarchy-nixos-plan.md` and `docs/porting-steps.md` before changing anything.
 
+Each file above owns one kind of fact and no other file repeats it. `docs/progress.md` is the
+only file with a checkbox or a "not yet" in it; `docs/porting-steps.md` is the only place a
+count of upstream files belongs; a list that exists in code — the `seeded` set, the command
+tables, the firewall ports — is linked, never transcribed. When you find yourself writing a
+fact that already exists somewhere, link it instead.
+
 ## Rules
 
 1. **Vendor, don't fork.** Consume upstream's themes, QML, Lua and configs from the vendored

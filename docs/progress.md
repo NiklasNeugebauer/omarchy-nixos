@@ -8,7 +8,7 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 
 - [x] flake with pinned inputs (nixpkgs, home-manager, disko, omarchy `flake = false`)
 - [x] repo layout, `.gitignore`, MIT licence + `NOTICE` attributing upstream
-- [x] GitHub Actions: `nix flake check`, `nix build .#omarchy`, format/lint, VM toplevel
+- [x] GitHub Actions green — see `.github/workflows/ci.yml` for the jobs
 - [x] docs: plan, porting steps, divergences, package inventory, sync procedure
 
 ## Phase 1 — the omarchy package
@@ -29,10 +29,10 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] faillock / `passwd_tries`, sudoers drop-ins, polkit, keyring, rtkit
 - [x] systemd-boot with a generation limit, flake-ready `nix.settings`, weekly GC
 - [x] docker via socket activation
-- [x] NetworkManager, resolved, nftables firewall (22 + 53317 only), regdb
+- [x] NetworkManager, resolved, the nftables firewall, regdb
 - [x] pipewire + wireplumber, bluez, A2DP autoconnect
 - [x] cups, avahi, nss-mdns
-- [~] verified: evaluates and builds; the firewall assertion is covered by `tests/session.nix`
+- [x] the firewall policy is asserted by `tests/session.nix`
 
 ## Phase 3 — session
 
@@ -44,8 +44,7 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] verified visually in a VM: `nix build .#greeter-screenshots` boots to
       `graphical.target` under llvmpipe and the omarchy greeter renders — branded logo,
       lock glyph, password field, theme colours
-- [ ] **verified on hardware: logging in reaches a Hyprland session** — the hardware
-      checklist below starts after the greeter, and nothing past login has been seen
+- [ ] **verified on hardware: logging in reaches a Hyprland session**
 
 ## Phase 4 — the shell
 
@@ -61,11 +60,13 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] desktop entries, nautilus extensions, agent skills, XCompose, btop theme link
 - [x] initial theme applied headlessly on first activation
 - [x] verified in the VM: activation succeeds, a user-owned file is seeded, a shipped
-      default resolves into the store, and a theme name is written
+      default resolves into the store, and the five per-application colour files are
+      rendered — a theme name alone is what a switcher with a broken PATH leaves behind
 
 ## Phase 6 — packages
 
-- [x] both `.packages` lists translated; 227 rows in `docs/omarchy-package-inventory.md`
+- [x] both `.packages` lists translated; every entry has a row in
+      `docs/omarchy-package-inventory.md`
 - [x] every attribute resolves against the pinned nixpkgs
 - [ ] the `unavailable` set (tensaku, ttfx, aether, omacalc, omacut, omawrite, …) — decide
       per package whether to write a derivation or accept the gap
@@ -84,17 +85,17 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 
 ## Phase 9 — tests
 
-- [x] `tests/session.nix`: CLI router, FHS regression, stubs, replacements, firewall
+- [x] `tests/session.nix`: CLI router, FHS regression, stubs, replacements, firewall,
+      rendered theme files
 - [x] `nix flake check` passes, VM test included
 - [x] the VM test executed to completion in a real qemu VM
-- [ ] the hardware checklist below run once on real hardware
+- [ ] the checklist below run once on real hardware
 
-## Hardware checklist
+## Verification checklist
 
-Run once per release, by a person, on a real machine. Nothing in CI can see any of it.
-
-Already covered by `nix build .#desktop-screenshots`, so a regression fails a build instead of
-waiting for someone to notice:
+Run once per release. The first list is covered by `nix build .#desktop-screenshots`, so a
+regression there fails a build instead of waiting for someone to notice. The second needs a
+person at a real machine, and nothing in CI can see any of it.
 
 - [x] boots to Hyprland via UWSM autologin
 - [x] Quickshell bar renders: workspaces, clock, tray, battery, volume
@@ -103,7 +104,7 @@ waiting for someone to notice:
 - [x] the generated per-application theme files exist
 - [x] no vendored command calls a tool that is not installed
 
-Still needs a person:
+Needs a person, on hardware:
 
 - [ ] Super+Space unified menu opens and launches apps
 - [ ] OSD on volume and brightness keys
@@ -116,44 +117,8 @@ Still needs a person:
 
 ## Known gaps
 
-- Nothing has been run on hardware, and nothing graphical has been seen. Every unchecked box
-  above is real: the VM test asserts that the greeter is wired up, not that it draws.
-- `docs/divergences.md` "Not available" is the user-visible cost of the port right now.
-
-## Verified in this session
-
-Run against the pinned inputs:
-
-- `nix build .#omarchy` — the package builds; the porting-step checks pass
-- `nix eval` on both hosts' `system.build.toplevel` — evaluates
-- `nix build` of `omarchy-vm.config.system.build.toplevel` — the whole closure builds
-- `nix fmt --fail-on-change`, `statix check`, `deadnix --fail`, `shellcheck` — clean
-- the CLI router against the built tree: `omarchy --help` lists its groups,
-  `omarchy commands --check` validates 438 commands' metadata, the stubs fail with a
-  pointer, `omarchy-pkg-present` returns the right exit codes, `omarchy version` prints the
-  upstream version, `omarchy theme list` reads the vendored themes
-- `nix build .#checks.x86_64-linux.session` — the NixOS VM test boots a qemu VM and passes
-- `nix build .#greeter-screenshots` — boots to `graphical.target` and the greeter renders
-- `nix build .#desktop-screenshots` — autologs in, Hyprland and the Quickshell shell come up,
-  the bar and the first-run notifications render, the five generated theme files exist, and
-  nothing in the session reported a command it could not find
-- `nix flake check` — green
-- the porting-step drift guard, checked by building the package against a source tree with
-  a stubbed command deleted: the build fails and names the file to edit
-
-Bugs that only a running system exposed, all fixed:
-
-- a shipped-default config directory linked as a store symlink breaks every application that
-  rewrites its own config
-- `services.displayManager.sddm.enable` does not wire `display-manager.service` into
-  `graphical.target` on current nixpkgs, so the system booted to a text console
-- the systemd user manager's PATH holds almost nothing on NixOS, so the shipped units'
-  scripts could not find `dbus-monitor` and `omarchy-sleep-lock.service` restart-looped
-- home-manager activation has its own PATH, so the initial theme switch wrote a theme name
-  and a background and rendered none of the per-application colour files
-- `XMODIFIERS=@im=fcitx` through `environment.sessionVariables` is parsed by pam_env, which
-  reads the leading `@` as an expansion sigil and drops the variable
-- `xkbcli` was missing, so the shell's keyboard-layout widget could not enumerate layouts
-
-The last four are the class porting step 7 warns about, and `.#desktop-screenshots` now fails
-on any of them: it asserts no command in a live session went unfound.
+- **Nothing has run on real hardware.** Every unchecked box above is real. The VM checks run
+  under llvmpipe on emulated hardware, which is not the same as a GPU, a keyboard, a battery
+  or a disk that has to be unlocked.
+- The `unavailable` rows in `docs/omarchy-package-inventory.md` are the user-visible cost of
+  the port as it stands.
