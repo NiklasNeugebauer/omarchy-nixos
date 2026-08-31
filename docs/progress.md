@@ -97,7 +97,7 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 
 ## Verified in this session
 
-Run with a rootless Nix (nix-portable) against the pinned inputs:
+Run against the pinned inputs:
 
 - `nix build .#omarchy` — the package builds; the porting-step checks pass
 - `nix eval` on both hosts' `system.build.toplevel` — evaluates
