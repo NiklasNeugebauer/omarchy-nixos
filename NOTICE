@@ -1,0 +1,25 @@
+omarchy-nixos
+=============
+
+This repository packages Omarchy for NixOS. It contains no copy of Omarchy's source: the
+upstream tree is a pinned flake input (`basecamp/omarchy`) and is consumed from the Nix store
+at build time. See docs/porting-steps.md for the complete list of modifications applied to
+that tree during packaging.
+
+Omarchy
+-------
+
+Copyright (c) David Heinemeier Hansson and the Omarchy contributors.
+Licensed under the MIT License. https://github.com/basecamp/omarchy
+
+The Omarchy name, logo and branding belong to their owners. This repository is an independent
+NixOS port and is not affiliated with, sponsored by, or endorsed by Basecamp or the Omarchy
+project.
+
+Third-party software
+--------------------
+
+Packages installed by modules/omarchy/packages.nix come from nixpkgs and carry their own
+licences. docs/omarchy-package-inventory.md records which upstream package each one
+translates. One package (Obsidian) is unfree; a host has to opt in with
+nixpkgs.config.allowUnfree.
