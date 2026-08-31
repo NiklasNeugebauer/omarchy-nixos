@@ -213,10 +213,21 @@ pkgs.testers.runNixOSTest {
     machine.succeed(
         "test -L /etc/systemd/system/graphical.target.wants/display-manager.service"
     )
-    exec_start = machine.succeed(
-        "systemctl show -p ExecStart --value display-manager.service"
-    )
-    assert "sddm" in exec_start.lower(), f"the greeter is not sddm: {exec_start!r}"
+    # NixOS wraps every unit's ExecStart in a generated start script, so the property
+    # names that script and never the greeter. Read what the script actually runs.
+    start_script = machine.succeed(
+        "systemctl show -p ExecStart --value display-manager.service "
+        "| sed -n 's/.*path=\\([^ ;]*\\).*/\\1/p'"
+    ).strip()
+    assert start_script, "display-manager.service has no ExecStart"
+    runs = machine.succeed(f"cat {start_script}")
+    assert "sddm" in runs.lower(), f"the greeter is not sddm:\n{runs}"
+
+    # The greeter's generated config has to name the vendored theme, or the login screen
+    # is stock sddm and the port's most visible piece is silently absent.
+    sddm_conf = machine.succeed("cat /etc/sddm.conf.d/00-nixos.conf")
+    assert "omarchy" in sddm_conf.lower(), \
+        f"sddm is not using the omarchy theme:\n{sddm_conf}"
 
     desktops = machine.succeed(
         "find /run/current-system/sw/share/wayland-sessions "

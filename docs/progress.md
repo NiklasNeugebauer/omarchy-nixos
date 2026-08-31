@@ -39,6 +39,8 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] Hyprland with UWSM, XWayland, uwsm `env.d` drop-in reaching the session
 - [x] SDDM with the omarchy theme, optional autologin
 - [x] XDG portals (hyprland + gtk), fcitx5, sleep hooks, mimeapps, xdg-terminal-exec
+- [x] verified in the VM: the greeter is wired into `graphical.target`, runs sddm with the
+      omarchy theme, and the `hyprland-uwsm` session desktop file is installed
 - [ ] **verified on hardware: boots to Hyprland** — see the checklist in `CLAUDE.md`
 
 ## Phase 4 — the shell
@@ -54,7 +56,8 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] `~/.bashrc` composed with upstream's `default/bash/rc`
 - [x] desktop entries, nautilus extensions, agent skills, XCompose, btop theme link
 - [x] initial theme applied headlessly on first activation
-- [ ] **verified: a fresh user gets a working home**
+- [x] verified in the VM: activation succeeds, a user-owned file is seeded, a shipped
+      default resolves into the store, and a theme name is written
 
 ## Phase 6 — packages
 
@@ -66,7 +69,8 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 ## Phase 7 — theming
 
 - [x] the vendored themes ship; `omarchy-theme-set` runs at first activation
-- [ ] **verified: `omarchy theme set` propagates to terminal, shell, GTK and Qt**
+- [x] verified in the VM: the switcher runs headlessly and writes the theme state
+- [ ] **verified on hardware: the switch propagates to terminal, shell, GTK and Qt**
 
 ## Phase 8 — disks and hardware
 
@@ -77,13 +81,14 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 ## Phase 9 — tests
 
 - [x] `tests/session.nix`: CLI router, FHS regression, stubs, replacements, firewall
-- [x] `nix flake check` evaluates
-- [ ] the VM test executed to completion
+- [x] `nix flake check` passes, VM test included
+- [x] the VM test executed to completion in a real qemu VM
 - [ ] the `CLAUDE.md` smoke-test checklist run once on hardware
 
 ## Known gaps
 
-- Nothing has been run on hardware. Every `[~]` and unchecked box above is real.
+- Nothing has been run on hardware, and nothing graphical has been seen. Every unchecked box
+  above is real: the VM test asserts that the greeter is wired up, not that it draws.
 - `docs/divergences.md` "Not available" is the user-visible cost of the port right now.
 
 ## Verified in this session
@@ -98,7 +103,8 @@ Run with a rootless Nix (nix-portable) against the pinned inputs:
   `omarchy commands --check` validates 438 commands' metadata, the stubs fail with a
   pointer, `omarchy-pkg-present` returns the right exit codes, `omarchy version` prints the
   upstream version, `omarchy theme list` reads the vendored themes
-- `nix build .#checks.x86_64-linux.session` — the NixOS VM test
+- `nix build .#checks.x86_64-linux.session` — the NixOS VM test boots a qemu VM and passes
+- `nix flake check` — green
 
 Two real bugs were found by that verification rather than by review, both now fixed:
 linking a shipped-default config directory as a store symlink broke every app that rewrites
