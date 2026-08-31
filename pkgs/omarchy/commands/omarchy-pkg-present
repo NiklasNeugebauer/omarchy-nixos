@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# omarchy:summary=Returns true if all of the named commands are available on the system (or false if any of them are missing).
+# omarchy:args=<packages...>
+
+# NixOS has no per-package query that maps onto Arch package names, and every caller in
+# the tree only wants to know "can I run this". Answer that instead.
+
+for pkg in "$@"; do
+  command -v "$pkg" &>/dev/null || exit 1
+done
+
+exit 0

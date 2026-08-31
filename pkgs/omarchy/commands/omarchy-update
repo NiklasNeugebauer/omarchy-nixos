@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# omarchy:summary=Rebuild the system from the flake and switch to the new generation
+# omarchy:args=[-y]
+# omarchy:examples=omarchy update | omarchy update -y
+
+# NixOS replacement for upstream's pacman-driven update. There is nothing to snapshot,
+# prune or migrate: the new generation is built before anything is switched, and the old
+# one stays bootable.
+
+set -euo pipefail
+
+# shellcheck source=/dev/null
+[[ -r /etc/omarchy-nixos.conf ]] && . /etc/omarchy-nixos.conf
+
+flake=${OMARCHY_NIXOS_FLAKE:-/etc/nixos}
+assume_yes=0
+[[ ${1:-} == "-y" ]] && assume_yes=1
+
+if [[ ! -e $flake/flake.nix ]]; then
+  cat >&2 <<MSG
+No flake found at $flake.
+
+Set OMARCHY_NIXOS_FLAKE in /etc/omarchy-nixos.conf, or in the NixOS config:
+
+  omarchy.flake = "/path/to/omarchy-nixos";
+MSG
+  exit 1
+fi
+
+echo "Updating flake inputs in $flake"
+nix flake update --flake "$flake"
+
+echo
+echo "Building the new generation"
+nixos-rebuild build --flake "$flake#$(hostname)"
+
+echo
+if (( assume_yes )) || omarchy-update-confirm; then
+  sudo nixos-rebuild switch --flake "$flake#$(hostname)"
+  omarchy-hook post-update || true
+  omarchy-update-restart
+fi

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# omarchy:summary=Check whether a system update is available
+
+# Upstream asks pacman. Here the question is whether the flake's inputs have moved, which
+# is answered by a lock-file comparison in a throwaway copy — nothing on the system changes.
+
+set -euo pipefail
+
+# shellcheck source=/dev/null
+[[ -r /etc/omarchy-nixos.conf ]] && . /etc/omarchy-nixos.conf
+
+flake=${OMARCHY_NIXOS_FLAKE:-/etc/nixos}
+[[ -e $flake/flake.lock ]] || exit 1
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+cp "$flake/flake.nix" "$flake/flake.lock" "$work/" 2>/dev/null || exit 1
+nix flake update --flake "$work" >/dev/null 2>&1 || exit 1
+
+if cmp -s "$flake/flake.lock" "$work/flake.lock"; then
+  exit 1
+fi
+
+echo "flake inputs have new revisions available"

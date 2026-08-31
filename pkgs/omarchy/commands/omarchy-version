@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# omarchy:summary=Print the installed Omarchy version
+
+# The vendored upstream version, plus the omarchy-nixos revision that packaged it.
+
+set -euo pipefail
+
+omarchy_path=${OMARCHY_PATH:?OMARCHY_PATH is not set}
+version=$(< "${omarchy_path%/}/version")
+
+if [[ -r /etc/omarchy-nixos.conf ]]; then
+  # shellcheck source=/dev/null
+  . /etc/omarchy-nixos.conf
+fi
+
+if [[ -n ${OMARCHY_NIXOS_REV:-} ]]; then
+  echo "$version (omarchy-nixos $OMARCHY_NIXOS_REV)"
+else
+  echo "$version (omarchy-nixos)"
+fi

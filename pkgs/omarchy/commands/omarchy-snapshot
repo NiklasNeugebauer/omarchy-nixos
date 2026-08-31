@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# omarchy:summary=List, or roll back to, a previous system generation
+# omarchy:args=[list|rollback]
+
+# Upstream drives Snapper btrfs snapshots through Limine. NixOS generations already are
+# the snapshot: every rebuild keeps the previous system bootable and switchable.
+
+set -euo pipefail
+
+case "${1:-list}" in
+  list)
+    exec nixos-rebuild list-generations
+    ;;
+  create)
+    echo "Every 'omarchy update' creates a new generation; there is nothing to snapshot." >&2
+    exit 127
+    ;;
+  rollback)
+    echo "Rolling back to the previous generation."
+    sudo nixos-rebuild switch --rollback
+    ;;
+  *)
+    echo "Usage: omarchy snapshot [list|rollback]" >&2
+    exit 1
+    ;;
+esac

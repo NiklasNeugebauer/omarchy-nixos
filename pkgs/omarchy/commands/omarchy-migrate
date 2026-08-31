@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# omarchy:summary=Report migration state (nothing to migrate on NixOS)
+# omarchy:args=[--pending]
+
+# Upstream migrations repair state that drifted since install. Nothing drifts here: the
+# system is rebuilt from the flake, so every migration is marked applied at build time
+# and this command has nothing left to do. Kept because the router and the login-time
+# notifier both call it.
+
+if [[ ${1:-} == "--pending" ]]; then
+  exit 1
+fi
+
+echo "No migrations to run: this system is rebuilt from its flake."
+exit 0
