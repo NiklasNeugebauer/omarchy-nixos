@@ -1,7 +1,7 @@
 # Generic encrypted laptop. Copy this directory to make a real host: drop in the output of
 # `nixos-generate-config --show-hardware-config`, set the disk's by-id path in disko.nix,
 # and change the user name.
-{ lib, pkgs, ... }:
+{ ... }:
 
 {
   imports = [

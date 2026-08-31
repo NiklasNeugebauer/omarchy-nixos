@@ -2,7 +2,7 @@
 #
 # `nix build .#nixosConfigurations.omarchy-vm.config.system.build.vm` produces a runnable
 # VM. Every change under modules/, home/ or patches/ goes through this host first.
-{ lib, pkgs, ... }:
+{ ... }:
 
 {
   imports = [ ../common.nix ];

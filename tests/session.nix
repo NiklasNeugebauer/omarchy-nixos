@@ -12,6 +12,8 @@
 #   - the Arch-machinery stubs fail loudly and name the NixOS equivalent
 #   - the reimplemented commands behave (pkg-present, version, migrate)
 #   - the firewall opens 22/tcp and 53317 tcp+udp and nothing else
+#   - home-manager activation for the user succeeded, and left behind a seeded
+#     user-owned file, a store-symlinked shipped default, and an applied theme
 #   - a greeter unit exists and is wanted by graphical.target, and a Hyprland uwsm
 #     session desktop file is installed
 #
@@ -30,10 +32,8 @@
   lib,
   pkgs,
   nixosModules,
-  # modules/omarchy/home.nix needs the home-manager NixOS module in the same
-  # evaluation. flake.nix does not pass it today; accepting it with a default keeps
-  # this test working either way, so the flake can start passing it without a change
-  # here.
+  # modules/omarchy/home.nix configures home-manager, so the home-manager NixOS module
+  # has to be in the same evaluation.
   homeManagerModule ? null,
   ...
 }:
@@ -44,9 +44,7 @@ pkgs.testers.runNixOSTest {
   nodes.machine =
     { ... }:
     {
-      imports =
-        [ nixosModules.omarchy ]
-        ++ lib.optional (homeManagerModule != null) homeManagerModule;
+      imports = [ nixosModules.omarchy ] ++ lib.optional (homeManagerModule != null) homeManagerModule;
 
       omarchy = {
         enable = true;
@@ -183,34 +181,52 @@ pkgs.testers.runNixOSTest {
         assert not port_open(rules, proto, port), \
             f"{port}/{proto} must not be open:\n{rules}"
 
+    # --- home-manager, which owns everything under $HOME ------------------------
+    # Its unit is wanted by multi-user.target, and a failed wanted unit does not stop
+    # the target — so waiting on multi-user.target alone would pass with the whole
+    # $HOME layer broken.
+    machine.wait_for_unit("home-manager-omarchy.service")
+
+    # A user-owned file, seeded once because upstream invites the user to edit it.
+    machine.succeed("test -f /home/omarchy/.config/hypr/hyprland.lua")
+    # A shipped default, which has to be a symlink into the store and not a copy.
+    alacritty = machine.succeed(
+        "readlink -f /home/omarchy/.config/alacritty"
+    ).strip()
+    assert alacritty.startswith("/nix/store/"), \
+        f"a shipped default was copied instead of linked: {alacritty!r}"
+    # The theme switcher ran headlessly during activation; without it every generated
+    # theme file is missing and the desktop comes up unstyled.
+    theme = machine.succeed(
+        "cat /home/omarchy/.local/state/omarchy/current/theme.name"
+    ).strip()
+    assert theme, "no theme was applied during home-manager activation"
+
     # --- the greeter and the session desktop file -------------------------------
-    # Tolerant on purpose: modules/omarchy/session.nix owns both, and a run before it
-    # lands should report the gap rather than fail the whole check.
-    if machine.execute("systemctl cat display-manager.service >/dev/null 2>&1")[0] == 0:
-        wanted = machine.succeed(
-            "systemctl show -p WantedBy --value display-manager.service"
-        )
-        assert "graphical.target" in wanted, \
-            f"display-manager.service is not wanted by graphical.target: {wanted!r}"
-        exec_start = machine.succeed(
-            "systemctl show -p ExecStart --value display-manager.service"
-        )
-        assert "sddm" in exec_start.lower(), \
-            f"the greeter is not sddm: {exec_start!r}"
-    else:
-        print("SKIP: no display-manager.service — no greeter is enabled yet")
+    # The sddm module builds display-manager.service but leaves its WantedBy empty, so
+    # this is the assertion that catches a system booting to a text console.
+    #
+    # Checked as the enablement symlink rather than through `systemctl show -p WantedBy`:
+    # systemd derives that property when the *depending* unit loads, and this VM stops at
+    # multi-user.target, so graphical.target is never loaded and the property is empty
+    # whether the greeter is wired up or not.
+    machine.succeed(
+        "test -L /etc/systemd/system/graphical.target.wants/display-manager.service"
+    )
+    exec_start = machine.succeed(
+        "systemctl show -p ExecStart --value display-manager.service"
+    )
+    assert "sddm" in exec_start.lower(), f"the greeter is not sddm: {exec_start!r}"
 
     desktops = machine.succeed(
         "find /run/current-system/sw/share/wayland-sessions "
         "/etc/xdg/wayland-sessions -name '*.desktop' 2>/dev/null || true"
     ).strip()
-    if not desktops:
-        print("SKIP: no wayland session desktop files installed yet")
-    else:
-        uwsm_sessions = [p for p in desktops.splitlines() if "uwsm" in p.lower()]
-        assert uwsm_sessions, f"no uwsm session among:\n{desktops}"
-        entry = machine.succeed(f"cat {uwsm_sessions[0]}")
-        assert "hyprland" in entry.lower(), \
-            f"the uwsm session is not Hyprland:\n{entry}"
+    assert desktops, "no wayland session desktop file is installed"
+    uwsm_sessions = [p for p in desktops.splitlines() if "uwsm" in p.lower()]
+    assert uwsm_sessions, f"no uwsm session among:\n{desktops}"
+    entry = machine.succeed(f"cat {uwsm_sessions[0]}")
+    assert "hyprland" in entry.lower(), \
+        f"the uwsm session is not Hyprland:\n{entry}"
   '';
 }

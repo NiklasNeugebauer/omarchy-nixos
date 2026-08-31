@@ -1,6 +1,6 @@
 # What every host shares regardless of hardware. Anything hardware- or disk-specific
 # belongs in the host directory, not here.
-{ lib, pkgs, ... }:
+{ lib, ... }:
 
 {
   time.timeZone = lib.mkDefault "UTC";

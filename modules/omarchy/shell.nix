@@ -37,30 +37,31 @@ in
     # instead of being frozen here.
     systemd.packages = [ cfg.package ];
 
-    systemd.user.services = lib.mapAttrs
-      (_: target: {
-        overrideStrategy = "asDropin";
-        wantedBy = [ target ];
-      })
-      {
-        # Auto-accept pairing agent, so the bluetooth panel can pair without a prompt of
-        # its own. Inert when there is no bluetooth adapter (ConditionPathIsDirectory).
-        "bt-agent" = "graphical-session.target";
+    systemd.user.services =
+      lib.mapAttrs
+        (_: target: {
+          overrideStrategy = "asDropin";
+          wantedBy = [ target ];
+        })
+        {
+          # Auto-accept pairing agent, so the bluetooth panel can pair without a prompt of
+          # its own. Inert when there is no bluetooth adapter (ConditionPathIsDirectory).
+          "bt-agent" = "graphical-session.target";
 
-        # Holds a logind delay inhibitor and locks the session before suspend. The 15s
-        # InhibitDelayMaxSec in system.nix is what gives it time to finish.
-        "omarchy-sleep-lock" = "graphical-session.target";
+          # Holds a logind delay inhibitor and locks the session before suspend. The 15s
+          # InhibitDelayMaxSec in system.nix is what gives it time to finish.
+          "omarchy-sleep-lock" = "graphical-session.target";
 
-        # Announces process crashes. Inert when the user has toggled crash capture off.
-        "omarchy-crash-watch" = "graphical-session.target";
+          # Announces process crashes. Inert when the user has toggled crash capture off.
+          "omarchy-crash-watch" = "graphical-session.target";
 
-        # The input method the session's IM environment variables point at.
-        "omarchy-fcitx5" = "graphical-session.target";
+          # The input method the session's IM environment variables point at.
+          "omarchy-fcitx5" = "graphical-session.target";
 
-        # Re-enables the internal display before the session starts when the toggle that
-        # disabled it survived an external monitor going away.
-        "omarchy-recover-internal-monitor" = "graphical-session-pre.target";
-      };
+          # Re-enables the internal display before the session starts when the toggle that
+          # disabled it survived an external monitor going away.
+          "omarchy-recover-internal-monitor" = "graphical-session-pre.target";
+        };
 
     # Deliberately not enabled: omarchy-speaker-tuning (needs a per-model tuning installed
     # at runtime first) and omarchy-tailscale-receive (needs tailscale). Both ship in the

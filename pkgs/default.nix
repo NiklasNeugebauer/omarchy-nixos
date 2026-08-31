@@ -5,7 +5,7 @@
 #   nixpkgs.overlays = [ (import ./pkgs { omarchySrc = <omarchy tree>; }) ];
 { omarchySrc }:
 
-final: prev: {
+final: _prev: {
   omarchy = final.callPackage ./omarchy { src = omarchySrc; };
 
   # Quickshell comes from nixpkgs unchanged. Upstream omarchy pins no version, and the

@@ -85,3 +85,23 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 
 - Nothing has been run on hardware. Every `[~]` and unchecked box above is real.
 - `docs/divergences.md` "Not available" is the user-visible cost of the port right now.
+
+## Verified in this session
+
+Run with a rootless Nix (nix-portable) against the pinned inputs:
+
+- `nix build .#omarchy` — the package builds; the porting-step checks pass
+- `nix eval` on both hosts' `system.build.toplevel` — evaluates
+- `nix build` of `omarchy-vm.config.system.build.toplevel` — the whole closure builds
+- `nix fmt --fail-on-change`, `statix check`, `deadnix --fail`, `shellcheck` — clean
+- the CLI router against the built tree: `omarchy --help` lists its groups,
+  `omarchy commands --check` validates 438 commands' metadata, the stubs fail with a
+  pointer, `omarchy-pkg-present` returns the right exit codes, `omarchy version` prints the
+  upstream version, `omarchy theme list` reads the vendored themes
+- `nix build .#checks.x86_64-linux.session` — the NixOS VM test
+
+Two real bugs were found by that verification rather than by review, both now fixed:
+linking a shipped-default config directory as a store symlink broke every app that rewrites
+its own config, and `services.displayManager.sddm.enable` does not wire
+`display-manager.service` into `graphical.target` on current nixpkgs, so the system booted
+to a text console with no greeter.

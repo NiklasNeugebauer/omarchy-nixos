@@ -21,7 +21,8 @@ let
   version = lib.fileContents "${src}/version";
   archOnly = import ./nixos-commands.nix;
 
-  # A stub that reports the NixOS equivalent instead of failing inside pacman.
+  # A stub that reports the NixOS equivalent instead of failing inside pacman. The summary
+  # header is what the router lists it under, so it has to be there.
   stubFor = name: hint: ''
     #!/bin/bash
 
@@ -39,7 +40,10 @@ stdenvNoCC.mkDerivation {
 
   # In buildInputs, not nativeBuildInputs: patchShebangs resolves #! interpreters for the
   # host platform out of these.
-  buildInputs = [ bash python3 ];
+  buildInputs = [
+    bash
+    python3
+  ];
 
   dontConfigure = true;
   dontBuild = true;
@@ -55,7 +59,19 @@ stdenvNoCC.mkDerivation {
           echo "porting-steps: bin/${name} is gone upstream; drop it from nixos-commands.nix" >&2
           exit 1
         fi
+        # Commands upstream hides are internal helpers other commands call. Carrying the
+        # flag over keeps them out of `omarchy commands`, which would otherwise advertise a
+        # list of things that cannot work. Written as a full conditional: a bare `&&` whose
+        # left side fails takes the whole builder down under set -e.
+        if grep -q '^# omarchy:hidden=true' bin/${name}; then
+          hidden=1
+        else
+          hidden=0
+        fi
         install -m755 ${builtins.toFile "${name}.stub" (stubFor name hint)} bin/${name}
+        if (( hidden )); then
+          sed -i '/^# omarchy:summary=/a # omarchy:hidden=true' bin/${name}
+        fi
       '') archOnly
     )}
 

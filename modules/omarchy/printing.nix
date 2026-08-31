@@ -1,8 +1,9 @@
 # Printing and local service discovery.
 #
 # Upstream's contribution here is small: two cups-browsed directives that narrow what gets
-# auto-added, and a hardening drop-in plus a system user for the browsing daemon. NixOS runs
-# cups-browsed under its own unit and creates its own user, so only the policy carries over.
+# auto-added, and a hardening drop-in that moves the browsing daemon off root and out of the
+# shared cache directory. Both carry over — NixOS' cups-browsed unit sets an ExecStart and
+# nothing else, so without the drop-in the daemon runs unconfined as root.
 {
   lib,
   pkgs,
@@ -18,22 +19,23 @@ in
     services.printing = {
       enable = true;
 
-      # Driverless IPP is what a printer bought this decade speaks, and the generic drivers
-      # cover the rest without asking the user which PPD they need.
-      drivers = with pkgs; [
-        gutenprint
-        cups-filters
-        foomatic-db-ppds
-      ];
+      # Driverless IPP is what a printer bought this decade speaks, and it needs no driver
+      # package at all, and cups-filters is unconditional in
+      # the NixOS module. Upstream ships no PPD collection either, so none is added here: a
+      # printer that needs one is a per-host decision, not a default several hundred
+      # megabytes wide.
+      drivers = [ ];
 
       browsed.enable = true;
       # From etc/cups/cups-browsed.conf. Auto-creating a queue for every remote CUPS server
       # on the network fills the print dialog with printers in other rooms; driverless IPP
       # devices are the ones worth adding without being asked. Remote CUPS queues can still
-      # be added by hand.
+      # be added by hand. CacheDir goes with the CacheDirectory below: the default is under
+      # /var/cache/cups, which print filters can write to.
       browsedConf = ''
         CreateIPPPrinterQueues Driverless
         CreateRemoteCUPSPrinterQueues No
+        CacheDir /var/cache/cups-browsed
       '';
     };
 
@@ -41,21 +43,37 @@ in
     # This is also why resolved's own MulticastDNS is off in network.nix — one responder.
     services.avahi = {
       enable = true;
-      # From etc/nsswitch.conf: mdns_minimal ahead of dns, so a .local lookup never leaves
-      # the link and a non-.local name never waits on mDNS.
+      # From etc/nsswitch.conf, which uses mdns_minimal — that covers both address families,
+      # so a .local host reachable only over IPv6 resolves too.
       nssmdns4 = true;
-      openFirewall = true;
+      nssmdns6 = true;
+      # Deliberately false. It would open UDP 5353, and upstream's install/config/firewall.sh
+      # opens 53317 and nothing else; the firewall policy this system states is 22 and 53317
+      # only. Printer discovery still works outbound — a host that needs to *answer* mDNS
+      # queries opens the port itself and records why.
+      openFirewall = false;
       publish = {
         enable = true;
         userServices = true;
       };
     };
 
-    # The upstream drop-in that runs cups-browsed as its own user with ProtectSystem=strict
-    # has no counterpart: NixOS' cups-browsed unit already runs confined and its
-    # etc/sysusers.d user is created by the module. The one thing upstream moves that NixOS
-    # does not is the cache directory away from /var/cache/cups, which the print filters can
-    # write; NixOS gives the unit its own CacheDirectory, so that is already true here.
+    # From etc/systemd/system/cups-browsed.service.d/10-omarchy.conf. The daemon only needs
+    # to talk to the network and to cupsd, so it has no business running as root with the
+    # filesystem writable. DynamicUser replaces upstream's etc/sysusers.d entry: it allocates
+    # the user and the cache directory together, so there is no static account to keep in
+    # sync with the unit.
+    systemd.services.cups-browsed.serviceConfig = {
+      DynamicUser = true;
+      CacheDirectory = "cups-browsed";
+      CacheDirectoryMode = "0750";
+      UMask = "0027";
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      RestrictSUIDSGID = true;
+    };
 
     environment.systemPackages = with pkgs; [
       system-config-printer

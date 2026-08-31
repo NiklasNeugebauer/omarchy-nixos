@@ -1,5 +1,10 @@
 # CI for a public repo with no secrets configured: no cachix, no auth token, no
 # binary-cache push. Everything here has to work for a fork on the free tier.
+#
+# The jobs are split by cost so a typo does not cost three hours of runner time: `eval`
+# fails in minutes on any evaluation error, and the expensive builds only start if it
+# passes. Nothing is built twice — `eval` deliberately does not build, and each build job
+# owns exactly one output.
 name: CI
 
 on:
@@ -18,61 +23,49 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: flake check
+  eval:
+    name: evaluate
     runs-on: ubuntu-latest
-    # `nix flake check` evaluates every output and runs checks.session, the NixOS VM
-    # test. That is the slow part; the package build alone takes a couple of minutes.
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: cachix/install-nix-action@v30
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
-
       # There is no binary cache to push to, so this only caches Nix's own evaluation
       # and tarball cache. It saves input fetching, not builds.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/nix
           key: nix-eval-cache-${{ runner.os }}-${{ hashFiles('flake.lock') }}
           restore-keys: nix-eval-cache-${{ runner.os }}-
-
-      - name: nix flake check
-        run: nix flake check --print-build-logs
-
-      - name: build the omarchy package
-        run: nix build .#omarchy --print-build-logs
+      # --no-build: this job's whole job is to catch evaluation errors, in both hosts and
+      # in the VM test, before anything expensive starts.
+      - run: nix flake check --no-build --print-build-logs
 
   format:
     name: format and lint
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: cachix/install-nix-action@v30
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      # statix, deadnix and shellcheck come from the flake's devShell, so CI and a
-      # local `nix develop` lint with the same pinned versions.
-      - name: nix fmt --check
-        run: nix fmt -- --check .
+      # nixfmt-tree walks the repo itself and fails on any file it would have changed.
+      - name: nix fmt
+        run: nix fmt -- --fail-on-change
 
-      - name: statix
-        run: nix develop --command statix check .
+      # statix and deadnix come from the flake's devShell, so CI and a local
+      # `nix develop` lint with the same pinned versions.
+      - run: nix develop --command statix check .
+      - run: nix develop --command deadnix --fail .
 
-      - name: deadnix
-        run: nix develop --command deadnix --fail .
-
-      # The shell commands are the only hand-written shell in the repo; the vendored
-      # upstream tree is not ours to lint. `--severity=warning` keeps style-only
-      # findings out of the exit code.
+      # Our own shell only. The vendored upstream tree is not ours to lint.
       - name: shellcheck
         run: |
           nix develop --command bash -euo pipefail -c '
@@ -85,30 +78,69 @@ jobs:
             shellcheck --severity=warning "${files[@]}"
           '
 
-  vm:
-    name: VM toplevel (heavy)
+  package:
+    name: omarchy package
     runs-on: ubuntu-latest
-    # Building the VM host's whole system closure pulls in Hyprland, Quickshell, SDDM
-    # and the translated package lists. On a standard 2-core hosted runner that is
-    # mostly download time, but anything nixpkgs has not cached is built here.
-    # If this job starts timing out, move it to a larger runner rather than trimming
-    # the host: the point is that the real host config still evaluates and builds.
-    timeout-minutes: 180
+    needs: eval
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: cachix/install-nix-action@v30
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+      # This is where the porting steps' build-time checks run: an upstream release that
+      # introduces a new FHS assumption, or renames a stubbed command, fails here.
+      - run: nix build .#omarchy --print-build-logs
 
-      - uses: actions/cache@v4
+  system:
+    name: omarchy-vm system closure
+    runs-on: ubuntu-latest
+    needs: eval
+    # Hyprland, Quickshell, SDDM and the translated package lists. On a hosted 2-core
+    # runner this is mostly download time, but anything nixpkgs has not cached is built
+    # here. If it starts timing out, move it to a larger runner rather than trimming the
+    # host — the point is that the real host config still builds.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/nix
           key: nix-eval-cache-${{ runner.os }}-${{ hashFiles('flake.lock') }}
           restore-keys: nix-eval-cache-${{ runner.os }}-
-
-      - name: build omarchy-vm toplevel
-        run: |
+      - run: |
           nix build --print-build-logs \
             '.#nixosConfigurations.omarchy-vm.config.system.build.toplevel'
+
+  vm-test:
+    name: VM test (needs KVM)
+    runs-on: ubuntu-latest
+    needs: system
+    # The NixOS test driver boots a real VM. Hosted runners do not reliably expose
+    # /dev/kvm, and under TCG emulation this does not finish in any sane time — so the
+    # job reports rather than blocks, and the test is expected to be run locally. Point
+    # this at a runner with nested virtualisation to make it authoritative.
+    continue-on-error: true
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: check for KVM
+        id: kvm
+        run: |
+          if [[ -w /dev/kvm ]]; then
+            echo "available=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "available=false" >>"$GITHUB_OUTPUT"
+            echo "::warning::no /dev/kvm on this runner; skipping the VM test"
+          fi
+      - if: steps.kvm.outputs.available == 'true'
+        run: nix build .#checks.x86_64-linux.session --print-build-logs

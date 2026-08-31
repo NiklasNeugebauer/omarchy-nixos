@@ -57,8 +57,6 @@ in
         # The shell's Bluetooth panel shows a battery percentage per device, which bluez only
         # exposes through its experimental battery-provider interface.
         Experimental = true;
-        # Offer both roles so a phone can use the machine as a headset and vice versa.
-        ControllerMode = "dual";
       };
     };
 
@@ -67,13 +65,10 @@ in
     # install/hardware/speaker-tuning.sh and switched on and off with a command. They stay
     # runtime state: the tuning is chosen by DMI match on the live system, and rendering the
     # wrong vendor's graph into the store would be worse than not shipping one. The LV2
-    # limiter every tuning ends in is here so the feature works when it is switched on.
-    environment.systemPackages = with pkgs; [
-      lsp-plugins
-      alsa-utils
-      pamixer
-      wireplumber
-      pulseaudio # for pactl, which the volume helpers call
-    ];
+    # limiter every tuning ends in comes with the rest of the media tools in packages.nix.
+    #
+    # pactl is the one audio binary not covered there: the volume helpers call it, and
+    # pipewire-pulse provides the protocol but not the client.
+    environment.systemPackages = [ pkgs.pulseaudio ];
   };
 }

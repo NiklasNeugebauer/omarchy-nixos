@@ -107,9 +107,14 @@ in
 
       autoLogin = lib.mkIf cfg.autoLogin {
         enable = true;
-        user = cfg.user;
+        inherit (cfg) user;
       };
     };
+
+    # The sddm module defines display-manager.service but leaves its WantedBy empty and
+    # relies on the caller to pull it in, so without this graphical.target comes up with no
+    # greeter behind it and the machine sits at a text console.
+    systemd.services.display-manager.wantedBy = [ "graphical.target" ];
 
     # Upstream strips pam_gnome_keyring from /etc/pam.d/sddm (install/login/sddm.sh) so a
     # password login does not create an encrypted login keyring that fights the
@@ -144,12 +149,15 @@ in
     # business; thumbnailing for the file manager and the shell's image picker is not.
     services.tumbler.enable = true;
 
+    # Deliberately not in the docker group. install/config/docker.sh is a file whose entire
+    # content is a comment explaining why upstream leaves it out: membership is equivalent to
+    # passwordless root, because any process in the group can bind-mount / into a container
+    # and write to it as root. Adding it per host is a decision, not a default.
     users.users.${cfg.user}.extraGroups = [
       "video"
       "audio"
       "input"
       "networkmanager"
-      "docker"
     ];
   };
 }

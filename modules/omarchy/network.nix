@@ -86,7 +86,6 @@ in
     # The shell's network panel talks to NetworkManager over D-Bus, but the CLI helpers
     # behind the menu shell out to these.
     environment.systemPackages = with pkgs; [
-      networkmanagerapplet
       iw
       ethtool
       dnsutils

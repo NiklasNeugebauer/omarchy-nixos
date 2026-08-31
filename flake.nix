@@ -32,13 +32,17 @@
       ...
     }:
     let
-      systems = [ "x86_64-linux" "aarch64-linux" ];
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
       # Our packages, as an overlay so hosts and `nix build` see the same tree.
       overlay = import ./pkgs { omarchySrc = omarchy; };
 
-      pkgsFor = system:
+      pkgsFor =
+        system:
         import nixpkgs {
           inherit system;
           overlays = [ overlay ];
@@ -118,7 +122,7 @@
         {
           default = pkgs.mkShellNoCC {
             packages = with pkgs; [
-              nixfmt-rfc-style
+              nixfmt
               statix
               deadnix
               jq
@@ -128,6 +132,8 @@
         }
       );
 
-      formatter = forAllSystems (system: (pkgsFor system).nixfmt-rfc-style);
+      # nixfmt-tree rather than nixfmt itself: `nix fmt` hands the formatter a path, and
+      # bare nixfmt only accepts files.
+      formatter = forAllSystems (system: (pkgsFor system).nixfmt-tree);
     };
 }

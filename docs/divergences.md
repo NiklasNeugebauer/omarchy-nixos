@@ -56,6 +56,24 @@ otherwise fully declarative it is a surprise, so it is written down here.
   only to log failures, never as a lockout enforcer, so there is no 3-attempt lockout to
   raise. `sudo`'s `passwd_tries` is ported, which is what actually governs retries here.
 
+## Moved between layers
+
+Same behaviour, different owner — worth knowing because the file you would edit is not the
+file upstream tells you to edit.
+
+- **WirePlumber's Bluetooth A2DP autoconnect** is a system-level drop-in here, not
+  `~/.config/wireplumber/`. It is device policy about how a bluez card advertises profiles,
+  so it should hold for a fresh user with no dotfiles; upstream only put it in `$HOME`
+  because `/etc/skel` was the only seeding mechanism Arch gave it.
+- **cups-browsed hardening** comes from `systemd.services.cups-browsed.serviceConfig` rather
+  than a `/etc/systemd/system/…d/` drop-in, and uses `DynamicUser` in place of upstream's
+  `sysusers.d` account. NixOS' own cups-browsed unit sets an `ExecStart` and nothing else, so
+  without this the daemon would run unconfined as root — the drop-in is not optional here.
+- **mDNS is not reachable from the network.** `services.avahi.openFirewall` is off, because
+  it would open UDP 5353 and the stated policy is 22 and 53317 only. Avahi still browses
+  outbound, so finding a printer works; being found does not. A host that needs to answer
+  mDNS queries opens the port itself.
+
 ## Not available
 
 Basecamp ships several of its own applications through the AUR. Where nixpkgs has no

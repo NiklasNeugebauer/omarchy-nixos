@@ -48,6 +48,11 @@ in
         hibernation, which has to write the whole of RAM somewhere that survives power loss.
         Set it to at least the size of physical RAM if hibernation must work, and leave it
         `null` otherwise — an unused swap file costs the space whether it is touched or not.
+
+        This option alone does not make hibernation work. It creates the swap file; the
+        host's configuration still has to name it with `boot.resumeDevice` and pass the
+        file's physical `resume_offset` as a kernel parameter, neither of which can be known
+        until the file exists on the installed machine.
       '';
       example = "32G";
     };
@@ -71,7 +76,7 @@ in
   config = lib.mkIf cfg.enable {
     disko.devices.disk.main = {
       type = "disk";
-      device = cfg.device;
+      inherit (cfg) device;
       content = {
         type = "gpt";
         partitions = {
@@ -128,8 +133,11 @@ in
                 # Four seconds of work per attempt, paid once per boot by you and once per
                 # guess by an attacker.
                 "--iter-time 4000"
-                # Matches the flash page size of every current NVMe drive, so a single
-                # logical write is a single physical write instead of a read-modify-write.
+                # The LUKS encryption sector size, not the drive's. 4096 matches the
+                # underlying page size on current NVMe, so one logical write is one
+                # physical write rather than a read-modify-write. cryptsetup refuses a
+                # device whose size is not a multiple of it, so an older 512-byte-only
+                # drive needs this line dropped.
                 "--sector-size 4096"
               ];
               content = {
@@ -188,6 +196,10 @@ in
                     ];
                   };
 
+                  # Nothing here writes snapshots — NixOS generations are what replaces
+                  # upstream's Snapper rotation. The subvolume exists so that a host that
+                  # wants btrfs snapshots has the conventional place to put them, and so
+                  # they land somewhere the root subvolume is not.
                   "@snapshots" = {
                     mountpoint = "/.snapshots";
                     mountOptions = [
@@ -212,10 +224,7 @@ in
       };
     };
 
-    # journald starts in stage 1 and writes immediately. Without this the early journal
-    # lands on whatever is mounted at /var/log at that moment — the root subvolume — and is
-    # then hidden underneath the real subvolume for the rest of the boot, which is exactly
-    # the journal you want when a boot goes wrong.
-    fileSystems."/var/log".neededForBoot = true;
+    # /var/log is neededForBoot because NixOS marks it so itself; restating it here would
+    # only be a second place to keep in sync.
   };
 }

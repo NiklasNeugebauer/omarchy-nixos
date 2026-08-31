@@ -12,7 +12,10 @@
     "sd_mod"
     "sdhci_pci"
   ];
-  boot.kernelModules = [ "kvm-intel" "kvm-amd" ];
+  boot.kernelModules = [
+    "kvm-intel"
+    "kvm-amd"
+  ];
 
   hardware.enableRedistributableFirmware = true;
   hardware.cpu.intel.updateMicrocode = lib.mkDefault true;

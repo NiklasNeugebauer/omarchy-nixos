@@ -144,11 +144,13 @@ in
     };
 
     # From install/config/locate.sh. btrfs subvolume mounts such as /home look like bind
-    # mounts, so pruning them would drop /home out of the index entirely.
+    # mounts, so pruning them would drop /home out of the index entirely. The snapshot
+    # subvolume is pruned for the opposite reason: indexing it would duplicate every
+    # snapshotted path in the results.
     services.locate = {
       enable = true;
-      package = pkgs.plocate;
       pruneBindMounts = false;
+      prunePaths = lib.mkAfter [ "/.snapshots" ];
     };
     # From etc/systemd/system/plocate-updatedb.service.d/ac-only.conf: a full-disk walk is
     # not something to spend battery on.
@@ -164,22 +166,12 @@ in
         ConnectTimeout 10
     '';
 
-    services.openssh = {
-      enable = true;
-      settings = {
-        PasswordAuthentication = false;
-        KbdInteractiveAuthentication = false;
-        PermitRootLogin = "no";
-      };
-    };
-
     # Upstream raises pam_faillock's lockout from Arch's 3 attempts to 10. NixOS' pam stack
     # uses pam_faillock only to log failures, never to lock an account out, so there is no
     # lockout to raise — the file is written for an admin who adds faillock to the stack, and
     # the setting that actually governs retries on this system is sudo's passwd_tries below.
     environment.etc."security/faillock.conf".text = ''
       deny = 10
-      unlock_time = 120
     '';
 
     security.sudo = {
@@ -216,11 +208,13 @@ in
               command = "${commandDir}/omarchy-theme-set-browser-policy [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]";
               options = [ "NOPASSWD" ];
             }
-            # From etc/sudoers.d/omarchy-tzupdate. Upstream constrains the zone name with a
-            # pattern sudoers does not actually support; a glob is the honest equivalent and
-            # the helper validates the name itself before calling this.
+            # From etc/sudoers.d/omarchy-tzupdate. Upstream anchors its pattern with ^ and $,
+            # which sudoers does not implement, but its character classes are ordinary
+            # sudoers globs and are kept. A bare * would not be equivalent: sudoers matches
+            # the arguments as one concatenated string, so * spans argument boundaries and
+            # would grant timedatectl set-timezone followed by anything at all.
             {
-              command = "${commandDir}/timedatectl set-timezone *";
+              command = "${commandDir}/timedatectl set-timezone [A-Za-z0-9_+]*";
               options = [ "NOPASSWD" ];
             }
           ];
@@ -230,7 +224,6 @@ in
 
     security.polkit.enable = true;
     security.rtkit.enable = true;
-    services.dbus.implementation = "broker";
 
     # The keyring backs the browser's and the shell's secret storage. Unlocked by the login
     # password through pam, which is why it is named on the greeter's pam service too.

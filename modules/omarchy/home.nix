@@ -16,7 +16,6 @@
 #     of this port; see docs/divergences.md.
 {
   lib,
-  pkgs,
   config,
   ...
 }:
@@ -81,21 +80,21 @@ in
         xdg.enable = true;
 
         # Shipped defaults, straight from the vendored tree.
-        xdg.configFile = lib.listToAttrs (
-          map (entry: {
-            name = entry;
-            value.source = "${omarchyPath}/config/${entry}";
-          }) shippedDefaults
-        )
-        // {
-          # btop reads its theme from a fixed filename while the theme switcher rewrites
-          # what the state directory points at, so this has to stay a live symlink rather
-          # than a store path resolved at build time. It can only sit beside a seeded
-          # btop.conf, not inside a store-symlinked btop directory.
-          "btop/themes/current.theme".source =
-            homeArgs.config.lib.file.mkOutOfStoreSymlink
-              "${homeArgs.config.home.homeDirectory}/.local/state/omarchy/current/theme/btop.theme";
-        };
+        xdg.configFile =
+          lib.listToAttrs (
+            map (entry: {
+              name = entry;
+              value.source = "${omarchyPath}/config/${entry}";
+            }) shippedDefaults
+          )
+          // {
+            # btop reads its theme from a fixed filename while the theme switcher rewrites
+            # what the state directory points at, so this has to stay a live symlink rather
+            # than a store path resolved at build time. It can only sit beside a seeded
+            # btop.conf, not inside a store-symlinked btop directory.
+            "btop/themes/current.theme".source =
+              homeArgs.config.lib.file.mkOutOfStoreSymlink "${homeArgs.config.home.homeDirectory}/.local/state/omarchy/current/theme/btop.theme";
+          };
 
         home.file = {
           # Nautilus gains its LocalSend and transcode actions from these.
@@ -105,11 +104,9 @@ in
           # Upstream symlinks the shipped agent skills into every agent's skills directory
           # so a pin bump updates them in place.
           ".claude/skills/omarchy".source = "${omarchyPath}/default/agents/skills/omarchy";
-          ".claude/skills/diagnose-crash".source =
-            "${omarchyPath}/default/agents/skills/diagnose-crash";
+          ".claude/skills/diagnose-crash".source = "${omarchyPath}/default/agents/skills/diagnose-crash";
           ".agents/skills/omarchy".source = "${omarchyPath}/default/agents/skills/omarchy";
-          ".agents/skills/diagnose-crash".source =
-            "${omarchyPath}/default/agents/skills/diagnose-crash";
+          ".agents/skills/diagnose-crash".source = "${omarchyPath}/default/agents/skills/diagnose-crash";
 
           # Upstream's XCompose sequences, included rather than copied so a pin bump
           # carries new sequences and anything the user adds above the include survives.
@@ -151,49 +148,49 @@ in
 
         # Seeded once, then the user's. `install -D` creates the parent and never clobbers,
         # which is exactly what /etc/skel does at user creation.
-        home.activation.omarchySeedUserFiles =
-          homeArgs.lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            seed() {
-              local src=$1 dest=$2
-              if [[ ! -e $dest ]]; then
-                run mkdir -p "$(dirname "$dest")"
-                run install -m644 "$src" "$dest"
-              fi
-            }
+        home.activation.omarchySeedUserFiles = homeArgs.lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          seed() {
+            local src=$1 dest=$2
+            if [[ ! -e $dest ]]; then
+              run mkdir -p "$(dirname "$dest")"
+              run install -m644 "$src" "$dest"
+            fi
+          }
 
-            seed_tree() {
-              local src=$1 dest=$2 entry
-              while IFS= read -r -d "" entry; do
-                seed "$entry" "$dest/''${entry#"$src"/}"
-              done < <(find "$src" -type f -print0)
-            }
+          seed_tree() {
+            local src=$1 dest=$2 entry
+            while IFS= read -r -d "" entry; do
+              seed "$entry" "$dest/''${entry#"$src"/}"
+            done < <(find "$src" -type f -print0)
+          }
 
-            ${lib.concatMapStringsSep "\n" (dir: ''
-              seed_tree ${omarchyPath}/config/${dir} "$HOME/.config/${dir}"
-            '') seeded}
+          ${lib.concatMapStringsSep "\n" (dir: ''
+            seed_tree ${omarchyPath}/config/${dir} "$HOME/.config/${dir}"
+          '') seeded}
 
-            # Hyprland's runtime toggle flags, which the compositor rewrites in place.
-            seed_tree ${omarchyPath}/default/hypr/toggles \
-              "$HOME/.local/state/omarchy/toggles/hypr"
+          # Hyprland's runtime toggle flags, which the compositor rewrites in place.
+          seed_tree ${omarchyPath}/default/hypr/toggles \
+            "$HOME/.local/state/omarchy/toggles/hypr"
 
-            seed ${omarchyPath}/default/tensaku/state.toml \
-              "$HOME/.local/state/tensaku/state.toml"
+          seed ${omarchyPath}/default/tensaku/state.toml \
+            "$HOME/.local/state/tensaku/state.toml"
 
-            seed ${omarchyPath}/logo.txt "$HOME/.config/omarchy/branding/about.txt"
-            seed ${omarchyPath}/logo.txt "$HOME/.config/omarchy/branding/screensaver.txt"
-          '';
+          seed ${omarchyPath}/logo.txt "$HOME/.config/omarchy/branding/about.txt"
+          seed ${omarchyPath}/logo.txt "$HOME/.config/omarchy/branding/screensaver.txt"
+        '';
 
         # First login has no theme yet, and every generated theme file — the terminal
         # colours, the shell palette, the GTK and btop themes, the Hyprland colour module —
         # comes from running the switcher once. Headless because activation has no session
         # to notify.
         home.activation.omarchySetInitialTheme =
-          homeArgs.lib.hm.dag.entryAfter [ "omarchySeedUserFiles" ] ''
-            if [[ ! -s $HOME/.local/state/omarchy/current/theme.name ]]; then
-              run env OMARCHY_PATH=${omarchyPath} OMARCHY_THEME_HEADLESS=1 \
-                ${omarchyPath}/bin/omarchy-theme-set ${lib.escapeShellArg cfg.theme} || true
-            fi
-          '';
+          homeArgs.lib.hm.dag.entryAfter [ "omarchySeedUserFiles" ]
+            ''
+              if [[ ! -s $HOME/.local/state/omarchy/current/theme.name ]]; then
+                run env OMARCHY_PATH=${omarchyPath} OMARCHY_THEME_HEADLESS=1 \
+                  ${omarchyPath}/bin/omarchy-theme-set ${lib.escapeShellArg cfg.theme} || true
+              fi
+            '';
       };
     };
   };

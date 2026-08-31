@@ -1,0 +1,11 @@
+# statix lints that do not apply to NixOS module code.
+#
+# repeated_keys ("Avoid repeated keys in attribute sets") wants
+#   services = { thermald.enable = true; fwupd.enable = true; }
+# instead of two dotted assignments. In a module that translates one upstream setting per
+# option, each assignment carries the comment explaining where the value came from, and
+# grouping them by their first path component separates a value from its reason and puts
+# unrelated settings under one brace. The dotted form is also what NixOS' own modules and
+# every configuration.nix use, so following this lint would make the code read less like
+# the ecosystem it lives in, not more.
+disabled = ["repeated_keys"]
