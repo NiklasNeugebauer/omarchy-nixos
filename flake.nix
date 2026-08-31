@@ -88,6 +88,12 @@
             inherit (self) nixosModules;
             homeManagerModule = home-manager.nixosModules.home-manager;
           };
+
+          # One step further: autologin, then Hyprland and the Quickshell shell.
+          desktop-screenshots = pkgs.callPackage ./tests/desktop.nix {
+            inherit (self) nixosModules;
+            homeManagerModule = home-manager.nixosModules.home-manager;
+          };
         }
       );
 

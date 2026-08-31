@@ -1,7 +1,7 @@
 # Smoke-test host. Never installed to metal: no encryption, and it logs itself in.
 #
 # `nix build .#nixosConfigurations.omarchy-vm.config.system.build.vm` produces a runnable
-# VM. Every change under modules/, home/ or patches/ goes through this host first.
+# VM. Every change under modules/, pkgs/ or patches/ goes through this host first.
 { ... }:
 
 {
@@ -26,7 +26,8 @@
     extraGroups = [ "wheel" ];
   };
 
-  boot.loader.systemd-boot.enable = true;
+  # systemd-boot itself comes from modules/omarchy/system.nix; a VM must not be allowed to
+  # write the host's EFI variables.
   boot.loader.efi.canTouchEfiVariables = false;
 
   # build-vm replaces the root device with its own image; this declaration is what makes

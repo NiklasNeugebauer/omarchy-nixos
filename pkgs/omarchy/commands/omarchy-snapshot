@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # omarchy:summary=List, or roll back to, a previous system generation
-# omarchy:args=[list|rollback]
+# omarchy:args=[list|restore|rollback]
 
 # Upstream drives Snapper btrfs snapshots through Limine. NixOS generations already are
 # the snapshot: every rebuild keeps the previous system bootable and switchable.
@@ -16,12 +16,14 @@ case "${1:-list}" in
     echo "Every 'omarchy update' creates a new generation; there is nothing to snapshot." >&2
     exit 127
     ;;
-  rollback)
+  # `restore` is upstream's verb; `rollback` is what NixOS calls the same thing. Both work,
+  # because a caller written against either spelling should not have to care.
+  restore | rollback)
     echo "Rolling back to the previous generation."
     sudo nixos-rebuild switch --rollback
     ;;
   *)
-    echo "Usage: omarchy snapshot [list|rollback]" >&2
+    echo "Usage: omarchy snapshot [list|restore|rollback]" >&2
     exit 1
     ;;
 esac

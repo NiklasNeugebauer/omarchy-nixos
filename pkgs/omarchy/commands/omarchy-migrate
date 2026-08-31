@@ -1,14 +1,16 @@
 #!/bin/bash
 
 # omarchy:summary=Report migration state (nothing to migrate on NixOS)
-# omarchy:args=[--pending]
+# omarchy:args=[--pending|--check]
 
 # Upstream migrations repair state that drifted since install. Nothing drifts here: the
 # system is rebuilt from the flake, so every migration is marked applied at build time
 # and this command has nothing left to do. Kept because the router and the login-time
 # notifier both call it.
 
-if [[ ${1:-} == "--pending" ]]; then
+# Both spellings upstream accepts. Answering only one would silently report "pending" to a
+# caller using the other, and the login-time notifier is such a caller.
+if [[ ${1:-} == "--pending" || ${1:-} == "--check" ]]; then
   exit 1
 fi
 

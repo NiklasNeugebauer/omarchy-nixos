@@ -28,8 +28,14 @@ MSG
   exit 1
 fi
 
-echo "Updating flake inputs in $flake"
-nix flake update --flake "$flake"
+# Bumping the inputs rewrites flake.lock. A read-only checkout (/etc/nixos, or a repo owned
+# by another user) can still be rebuilt from, so this is a skip and not an error.
+if [[ -w $flake && -w $flake/flake.lock ]]; then
+  echo "Updating flake inputs in $flake"
+  nix flake update --flake "$flake"
+else
+  echo "$flake is not writable; rebuilding from the current flake.lock without bumping it."
+fi
 
 echo
 echo "Building the new generation"

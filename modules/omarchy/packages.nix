@@ -52,6 +52,12 @@ let
     glib # gsettings, gdbus
     gtk3 # gtk-update-icon-cache
     dconf
+    # dbus-monitor, which omarchy-system-sleep-monitor execs to watch for the prepare-sleep
+    # signal. Without it omarchy-sleep-lock.service restart-loops and the session never
+    # locks before suspend.
+    dbus
+    # xkbcli, which the shell's keyboard-layout widget shells out to.
+    libxkbcommon
   ];
 
   terminals = with pkgs; [

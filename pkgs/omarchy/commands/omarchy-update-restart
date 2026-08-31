@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# omarchy:summary=Prompt for a required reboot or restart the services that need it
+
+# Upstream decides whether the kernel changed by asking pacman which package owns each
+# /usr/lib/modules/*/vmlinuz. Neither the glob nor pacman exists here, and upstream's loop
+# leaves its "kernel updated" flag set when the glob matches nothing — so it would prompt
+# for a reboot after every single update. NixOS answers the same question exactly:
+# /run/booted-system is the generation running now, /run/current-system the one just
+# switched to, and comparing their kernels is definitive.
+#
+# The same applies to its Hyprland check, which looks for "(deleted)" behind the running
+# process's exe. A store path is never deleted underneath a running process, so that test
+# can never fire; comparing the two generations' system closures does the job.
+
+set -uo pipefail
+
+echo
+
+confirm_reboot() {
+  gum confirm "$1" && {
+    omarchy-system-reboot
+    exit 0
+  }
+}
+
+booted=/run/booted-system
+current=/run/current-system
+
+if [[ -e $booted && -e $current ]]; then
+  if [[ $(readlink -f "$booted/kernel") != $(readlink -f "$current/kernel") ]]; then
+    confirm_reboot "Linux kernel has been updated. Reboot?"
+  elif [[ $(readlink -f "$booted/initrd") != $(readlink -f "$current/initrd") ]]; then
+    confirm_reboot "Boot files have been updated. Reboot?"
+  fi
+fi
+
+if [[ -f $HOME/.local/state/omarchy/reboot-required ]]; then
+  confirm_reboot "Updates require reboot. Ready?"
+fi
+
+# Upstream's own mechanism, unchanged: any command can drop a marker asking for a restart.
+for file in "$HOME"/.local/state/omarchy/restart-*-required; do
+  if [[ -f $file ]]; then
+    filename=$(basename "$file")
+    service=${filename#restart-}
+    service=${service%-required}
+    echo "Restarting $service"
+    omarchy-state clear "$filename"
+    "omarchy-restart-$service"
+  fi
+done
+
+# A rebuild routinely replaces the shell's QML, and a stale process can lazy-load new files
+# into old code. A restart failure (locked session, ssh, TTY) only prints its reason: the
+# next update or login gets a fresh shell anyway.
+echo -e "\e[32m\nRestarting shell\e[0m"
+echo "All plugins have been reloaded"
+omarchy-restart-shell || true

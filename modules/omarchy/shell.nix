@@ -16,15 +16,10 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    environment.systemPackages = with pkgs; [
-      quickshell
-      # The shell renders theme backgrounds and tray icons in formats Qt does not carry
-      # by default (webp, avif, and the rest), listed upstream as qt6-imageformats.
-      kdePackages.qtimageformats
-      kdePackages.qtsvg
-      # QML needs these at runtime for the panels that talk to them directly.
-      kdePackages.qtwayland
-    ];
+    # quickshell brings its own Qt closure: wrapQtAppsHook pins QT_PLUGIN_PATH and
+    # QML2_IMPORT_PATH to it, so adding Qt modules here would not reach the shell. The
+    # image-format plugin it needs is added to the package itself in pkgs/default.nix.
+    environment.systemPackages = [ pkgs.quickshell ];
 
     # The shell IS the notification daemon: shell/plugins/notifications/Service.qml claims
     # org.freedesktop.Notifications on the session bus. Do not add dunst, mako or swaync to
@@ -42,6 +37,12 @@ in
         (_: target: {
           overrideStrategy = "asDropin";
           wantedBy = [ target ];
+          # NixOS gives user units a PATH of just coreutils, findutils, grep, sed and
+          # systemd. These units' ExecStart paths were rewritten to the system profile, but
+          # the scripts behind them call ordinary tools by name — omarchy-system-sleep-monitor
+          # execs dbus-monitor, and without the profile on PATH it restart-loops instead of
+          # ever locking the session before suspend.
+          path = [ "/run/current-system/sw" ];
         })
         {
           # Auto-accept pairing agent, so the bluetooth panel can pair without a prompt of

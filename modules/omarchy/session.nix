@@ -44,6 +44,15 @@ in
       # Upstream's shipped default associations, at the system level so a user's own
       # ~/.config/mimeapps.list still wins.
       "xdg/mimeapps.list".source = "${omarchyPath}/default/applications/mimeapps.list";
+
+      # The input-method variables, as upstream's own environment.d file rather than
+      # restated here. They have to be set before any toolkit initialises, which is earlier
+      # than a shell rc runs, and this is the drop-in directory the systemd user manager
+      # reads. Deliberately not environment.sessionVariables: NixOS routes those through
+      # pam_env, whose parser reads XMODIFIERS' leading @ as an expansion sigil, logs
+      # "Expandable variables must be wrapped in {}" and drops the variable.
+      "environment.d/10-omarchy-fcitx.conf".source =
+        "${omarchyPath}/default/environment.d/10-omarchy-fcitx.conf";
     }
     # Sleep hooks upstream installs to /usr/lib/systemd/system-sleep. systemd reads
     # /etc/systemd/system-sleep too, and these are plain scripts with no NixOS equivalent:
@@ -65,15 +74,6 @@ in
         ]
     );
 
-    # fcitx5 needs these in the session before any toolkit initialises, which is earlier
-    # than a shell rc runs. From default/environment.d/10-omarchy-fcitx.conf.
-    environment.sessionVariables = {
-      INPUT_METHOD = "fcitx";
-      QT_IM_MODULE = "fcitx";
-      XMODIFIERS = "@im=fcitx";
-      SDL_IM_MODULE = "fcitx";
-    };
-
     i18n.inputMethod = {
       enable = true;
       type = "fcitx5";
@@ -94,6 +94,9 @@ in
         theme = "omarchy";
         # The theme is a plain QtQuick + SddmComponents theme shipped in the vendored tree
         # and re-exported by the package at share/sddm/themes/omarchy.
+        # The theme is found because the package is in systemPackages and the sddm module
+        # links /share/sddm out of the system profile. This entry puts the same tree on the
+        # greeter's Qt plugin path, which the theme's QtQuick imports resolve against.
         extraPackages = [ cfg.package ];
         # Upstream runs the greeter on Hyprland itself, configured by
         # default/sddm/hyprland.lua. NixOS runs it on the compositor its sddm module
@@ -116,13 +119,10 @@ in
     # greeter behind it and the machine sits at a text console.
     systemd.services.display-manager.wantedBy = [ "graphical.target" ];
 
-    # Upstream strips pam_gnome_keyring from /etc/pam.d/sddm (install/login/sddm.sh) so a
-    # password login does not create an encrypted login keyring that fights the
-    # passwordless default keyring. Here the greeter never enables it in the first place;
-    # the keyring is unlocked by the login session instead. The keyring itself and polkit
-    # are enabled in system.nix. No separate polkit agent is started anywhere: the shell
-    # hosts one (Quickshell.Services.Polkit) and a second would race it for the session's
-    # agent registration.
+    # The keyring is unlocked here, on the login session, and nowhere else — system.nix
+    # explains why it stays off the greeter's pam stack. No polkit agent is started anywhere
+    # either: the shell hosts one (Quickshell.Services.Polkit) and a second would race it
+    # for the session's agent registration.
     security.pam.services.login.enableGnomeKeyring = true;
 
     xdg.portal = {

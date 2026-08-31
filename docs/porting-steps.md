@@ -38,19 +38,27 @@ commands call each other.
 switch), `omarchy-update-available` (compare the flake lock), `omarchy-pkg-present` /
 `omarchy-pkg-missing` (answer "can I run this" instead of querying pacman — every
 `omarchy install …` command and a lot of conditionals depend on their exit codes),
-`omarchy-version`, `omarchy-snapshot` (list and roll back generations) and `omarchy-migrate`
-(nothing to migrate).
+`omarchy-version`, `omarchy-snapshot` (list and roll back generations), `omarchy-migrate`
+(nothing to migrate) and `omarchy-update-restart` — upstream decides whether to prompt for a
+reboot by asking pacman which package owns the running kernel, and its loop leaves the flag
+set when the glob matches nothing, so unported it would prompt after every update. Comparing
+`/run/booted-system` against `/run/current-system` answers the same question exactly.
 
 *Verified by:* the build fails if a replaced command no longer exists upstream.
 
 ### 4. Rewrite the shebangs
 
-Upstream is uniformly `#!/bin/bash` (439 files) and `#!/usr/bin/python3` (5). Neither path
-exists on NixOS. Every occurrence is rewritten, not only line 1 — two commands write helper
-scripts from heredocs, and the shipped hooks, `.sample` files and `system-sleep` scripts are
-not executable, so nixpkgs' own `patchShebangs` does not reach them.
+Upstream is uniformly `#!/bin/bash` and `#!/usr/bin/python3` — 436 and 5 of the 441 commands
+in `bin/`, and 454 and 5 files across the whole shipped tree. Neither path exists on NixOS.
+Every occurrence is rewritten, not only line 1 — two commands write helper scripts from
+heredocs, and the shipped hooks, `.sample` files and `system-sleep` scripts are not
+executable, so nixpkgs' own `patchShebangs` does not reach them.
 
 *Verified by:* the build fails if any `#!/bin/bash` or `#!/usr/bin/python3` survives.
+
+Note the scope: the check greps for those two shebangs and for the two paths in steps 5 and
+6. It is not a general FHS scan, and unported absolute paths outside those four patterns do
+exist — `config/xournalpp/settings.xml` points at `/usr/share/xournalpp/resources/`, for one.
 
 ### 5. Rewrite `/usr/share/omarchy` to the store path
 
@@ -102,8 +110,14 @@ override modules, menu and hook extensions, runtime toggles, git identity — ar
 if absent. That last part is the one deliberately non-declarative corner of the port; it is
 recorded in `docs/divergences.md`.
 
-**Check by hand:** a new directory under upstream's `config/` is picked up automatically; a
-new *user-owned* one has to be added to the `userOwned` list in `home.nix`.
+**Check by hand:** a new directory under upstream's `config/` is picked up automatically and
+becomes a store symlink. That is wrong for two kinds of directory, and both have to be added
+to the `seeded` list in `home.nix` by hand:
+
+- one upstream invites the user to edit, and
+- one the *application* rewrites — an Electron profile, or any TUI that saves settings on
+  exit. This is the one a bump gets wrong, because nothing fails: the write to a read-only
+  store path is silently dropped and the setting simply does not stick.
 
 ### 10. Replace the update, rollback and reset story
 

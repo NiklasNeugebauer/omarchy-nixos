@@ -225,10 +225,12 @@ in
     security.polkit.enable = true;
     security.rtkit.enable = true;
 
-    # The keyring backs the browser's and the shell's secret storage. Unlocked by the login
-    # password through pam, which is why it is named on the greeter's pam service too.
+    # The keyring backs the browser's and the shell's secret storage. Deliberately not
+    # enabled on the greeter's pam service: install/login/sddm.sh strips pam_gnome_keyring
+    # from /etc/pam.d/sddm so a password login does not create an encrypted login keyring
+    # that then fights the passwordless default keyring omarchy sets up. session.nix
+    # unlocks it from the login session instead.
     services.gnome.gnome-keyring.enable = true;
-    security.pam.services.sddm.enableGnomeKeyring = lib.mkDefault true;
 
     # udisks + gvfs give the file manager and the shell's disk panel removable media.
     services.udisks2.enable = true;

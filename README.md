@@ -48,6 +48,18 @@ Nothing here touches your system.
 The VM host logs itself in and has no disk encryption. It exists to smoke test changes and is
 not an install target.
 
+Two automated VM checks go further than `nix flake check` can, and save screenshots you can
+look at:
+
+    nix build .#greeter-screenshots   # boots to the login screen
+    nix build .#desktop-screenshots   # logs in, waits for Hyprland and the shell
+    ls result/
+
+`.#desktop-screenshots` is also where a missing runtime tool surfaces: it fails if anything
+in the session reported a command it could not find. That is the one class of bug the package
+build cannot catch, because the tools the vendored commands shell out to live in the system
+profile rather than in each command's wrapper.
+
 ## Install on a machine
 
 Read [`hosts/omarchy-laptop/disko.nix`](hosts/omarchy-laptop/disko.nix) first — it will not

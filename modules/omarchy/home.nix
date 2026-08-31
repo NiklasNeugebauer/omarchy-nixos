@@ -16,6 +16,7 @@
 #     of this port; see docs/divergences.md.
 {
   lib,
+  pkgs,
   config,
   ...
 }:
@@ -38,9 +39,10 @@ let
   #   * upstream tells the user to edit the file ("Put your personal overrides in these
   #     files"), and a symlink into the store would make that impossible;
   #   * the application rewrites its own config — btop and xournalpp save settings on exit,
-  #     chromium owns its whole profile directory, fcitx5's config tool and lazygit write
-  #     back what the user changes in their UI. A symlinked directory turns every one of
-  #     those into a silent write failure, and a symlinked file into a lost setting.
+  #     chromium and obsidian own their whole Electron profile directories, and fcitx5's
+  #     config tool and lazygit write back what the user changes in their UI. A symlinked
+  #     directory turns every one of those into a silent write failure, and a symlinked file
+  #     into a lost setting.
   seeded = [
     "hypr"
     "omarchy"
@@ -49,6 +51,7 @@ let
     "chromium"
     "fcitx5"
     "lazygit"
+    "obsidian"
     "opencode"
     "xournalpp"
   ];
@@ -61,6 +64,23 @@ let
   # to a user who changed one is omarchy-reinstall-configs, which copies the shipped tree
   # back. A store symlink is permanently that shipped tree, so the resync has nothing to do.
   shippedDefaults = lib.subtractLists (seeded ++ systemOwned) configEntries;
+
+  # home-manager activation runs with a minimal PATH of its own, so anything it invokes from
+  # the vendored tree has to be handed one. omarchy-theme-set takes a flock, renders its
+  # templates by calling omarchy-theme-set-templates as a sibling command, and shells out to
+  # the usual text tools; without this it half-succeeds — writing the theme name and the
+  # background while silently rendering none of the terminal, GTK or shell colour files.
+  activationPath = lib.makeBinPath [
+    pkgs.coreutils
+    pkgs.util-linux
+    pkgs.gnused
+    pkgs.gnugrep
+    pkgs.gawk
+    pkgs.findutils
+    pkgs.bash
+    pkgs.jq
+    pkgs.imagemagick
+  ];
 
   # Desktop entries have to sit directly in ~/.local/share/applications for XDG to see
   # them, so they are linked one by one rather than as a directory.
@@ -131,6 +151,14 @@ in
         programs.bash = {
           enable = true;
           enableCompletion = true;
+
+          # Above the interactive guard, which is where upstream's own .bashrc puts it: an
+          # `ssh host omarchy-…` runs no interactive rc, and without this it has no
+          # $OMARCHY_PATH and no omarchy-* on PATH.
+          bashrcExtra = ''
+            source "${omarchyPath}/default/bash/env-bootstrap"
+          '';
+
           initExtra = ''
             source "${omarchyPath}/default/bash/rc"
           '';
@@ -153,7 +181,7 @@ in
             local src=$1 dest=$2
             if [[ ! -e $dest ]]; then
               run mkdir -p "$(dirname "$dest")"
-              run install -m644 "$src" "$dest"
+              run install -m "$(stat -c %a "$src")" "$src" "$dest"
             fi
           }
 
@@ -187,7 +215,10 @@ in
           homeArgs.lib.hm.dag.entryAfter [ "omarchySeedUserFiles" ]
             ''
               if [[ ! -s $HOME/.local/state/omarchy/current/theme.name ]]; then
-                run env OMARCHY_PATH=${omarchyPath} OMARCHY_THEME_HEADLESS=1 \
+                run env \
+                  PATH="${activationPath}:${omarchyPath}/bin" \
+                  OMARCHY_PATH=${omarchyPath} \
+                  OMARCHY_THEME_HEADLESS=1 \
                   ${omarchyPath}/bin/omarchy-theme-set ${lib.escapeShellArg cfg.theme} || true
               fi
             '';

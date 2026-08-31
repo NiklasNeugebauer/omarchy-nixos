@@ -25,15 +25,20 @@
     isNormalUser = true;
     description = "Omarchy";
     extraGroups = [ "wheel" ];
-    # Set with `passwd` after the first boot, or declare a hashed password out of band.
-    # Never a plaintext password and never a hash in this repo.
-    hashedPassword = null;
+    # No password is set here, and none may be: this repo is public, so neither a plaintext
+    # password nor a hash belongs in it. The consequence is that a fresh install cannot be
+    # logged into — the greeter rejects an empty password — so set one during the install,
+    # before the first boot:
+    #
+    #   nixos-enter --root /mnt -c 'passwd omarchy'
+    #
+    # `users.mutableUsers` stays true so that password survives every later rebuild.
   };
 
-  boot.loader = {
-    systemd-boot.enable = true;
-    efi.canTouchEfiVariables = true;
-  };
+  # The bootloader itself is configured in modules/omarchy/system.nix, which owns the
+  # generation limit that replaces upstream's Limine and Snapper story. Only the part that
+  # depends on this machine's firmware belongs here.
+  boot.loader.efi.canTouchEfiVariables = true;
 
   system.stateVersion = "26.05";
 }

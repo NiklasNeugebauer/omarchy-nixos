@@ -1,7 +1,7 @@
 # The omarchy-nixos NixOS module.
 #
 # Everything upstream does from `install/config/*.sh`, `install/hardware/*.sh` and its
-# `etc/**` drop-ins is expressed here as NixOS options — porting step 7. Nothing in this
+# `etc/**` drop-ins is expressed here as NixOS options — porting step 8. Nothing in this
 # tree executes an upstream install script at runtime.
 {
   lib,
@@ -60,6 +60,10 @@ in
       default = "/etc/nixos";
       description = ''
         Where this repo lives on the target. `omarchy update` rebuilds from it.
+
+        A path the user cannot write to still works, but `omarchy update` then skips the
+        input bump and only rebuilds — updating `flake.lock` is a write. Point this at a
+        checkout in the user's home to get the whole command.
       '';
     };
 
@@ -97,8 +101,10 @@ in
 
     environment.systemPackages = [ cfg.package ] ++ cfg.extraPackages;
 
-    # /etc/omarchy.conf must not exist. Upstream treats its presence as a dev link and
-    # would let a stale path win over the built system.
-    environment.etc."omarchy.conf".enable = false;
+    # Nothing here writes /etc/omarchy.conf. Upstream reads its presence as a dev link, and
+    # porting step 5 already made the store path the packaged location, so the file has no
+    # job to do — but a hand-written one would still be sourced by env-bootstrap and would
+    # outrank the built system. That is why `omarchy dev link`, which is what writes it, is
+    # stubbed rather than left working.
   };
 }

@@ -40,6 +40,25 @@ a *user-owned* default does not reach a user who already has that file. That is 
 `/etc/skel` contract upstream has, so the behaviour matches — but on a system that is
 otherwise fully declarative it is a surprise, so it is written down here.
 
+## Runtime tools live in the system profile
+
+Porting step 7 puts the tools the vendored `omarchy-*` commands shell out to in
+`environment.systemPackages` rather than wrapping each of the 441 commands, because wrapping
+would break the CLI router's own sibling discovery. The consequence is that a tool nobody
+listed fails at runtime, not at build time — and the places that bit are worth naming, because
+they are the shape of the next one:
+
+- **systemd user units** get a PATH from NixOS holding only coreutils, findutils, grep, sed
+  and systemd. The shipped units' scripts call ordinary tools by name, so they are given the
+  system profile explicitly; without it `omarchy-sleep-lock.service` restart-loops on a
+  missing `dbus-monitor` and the session never locks before suspend.
+- **home-manager activation** has a PATH of its own. The initial `omarchy theme set` runs
+  there, and without a PATH it half-succeeds: theme name and background written, none of the
+  terminal, GTK or shell colour files rendered.
+
+`nix build .#desktop-screenshots` fails if anything in a live session reported a command it
+could not find, which is the check for this.
+
 ## Session
 
 - **Session name.** Upstream ships `wayland-sessions/omarchy.desktop` ("Omarchy (Hyprland

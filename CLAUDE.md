@@ -13,7 +13,7 @@ to a NixOS base. Read `omarchy-nixos-plan.md` first; it is the authoritative pla
 2. **Replace Arch machinery, don't emulate it.** omarchy-update → nixos-rebuild; Snapper/Limine →
    generations; Reset → reinstall from flake; pacman anything → nixpkgs. If a task seems to
    require porting pacman-touching code, stop and log it as a divergence instead.
-3. **VM before hardware.** Any change to modules/, home/, or patches/ must pass
+3. **VM before hardware.** Any change to modules/, pkgs/, or patches/ must pass
    `nixos-rebuild build-vm --flake .#<host>` and a smoke test before being applied with
    `nixos-rebuild switch`. Never run `switch` unprompted.
 4. **Everything declarative.** No imperative system changes, no `nix-env -i`, no manual file
@@ -45,19 +45,30 @@ the PR/commit body: what changed upstream, what was translated, what was ignored
 
 ## Smoke test checklist (VM)
 
-`nix flake check` cannot see any of this. It has to be run by a human, once per release.
-The one exception is the greeter: `nix build .#greeter-screenshots` boots a VM to
-`graphical.target` and saves a screenshot of it, so that line can be checked without
-hardware.
+`nix flake check` cannot see most of this. Two VM checks cover part of it without hardware —
+`nix build .#greeter-screenshots` for the login screen and `nix build .#desktop-screenshots`
+for the session, both of which save screenshots to look at — and the rest needs a person at
+a real machine.
 
-- [ ] boots to Hyprland via UWSM autologin
-- [ ] Quickshell bar renders: workspaces, clock, tray, battery, volume
+Covered by `.#desktop-screenshots`, so a regression here fails a build rather than waiting
+for someone to notice:
+
+- [x] boots to Hyprland via UWSM autologin
+- [x] Quickshell bar renders: workspaces, clock, tray, battery, volume
+- [x] notifications appear
+- [x] theme switch propagates to the background and the bar
+- [x] no vendored command calls a tool that is not installed
+
+Still needs a human, on hardware:
+
 - [ ] Super+Space unified menu opens and launches apps
-- [ ] notifications appear; OSD on volume/brightness keys
+- [ ] OSD on volume/brightness keys
 - [ ] lock screen engages and unlocks
 - [ ] polkit prompt appears (e.g. systemctl restart something)
-- [ ] theme switch propagates to terminal + shell + GTK
-- [ ] firewall: only 22 and 53317 open
+- [ ] theme switch propagates to terminal + GTK + Qt applications
+- [ ] firewall: only 22 and 53317 open (asserted in tests/session.nix, worth confirming live)
+- [ ] suspend and resume, with the session locked before it sleeps
+- [ ] the LUKS passphrase prompt on the encrypted host
 
 ## Don'ts
 

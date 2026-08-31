@@ -28,7 +28,9 @@ echo
 # with no git history to diff against.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-git clone --quiet --bare https://github.com/basecamp/omarchy.git "$work/omarchy.git"
+# Blobs are fetched on demand by the diff below; a full history clone of this repo is
+# hundreds of megabytes of theme backgrounds nobody is diffing.
+git clone --quiet --bare --filter=blob:none https://github.com/basecamp/omarchy.git "$work/omarchy.git"
 
 changed=$(git -C "$work/omarchy.git" diff --name-only "$old" "$new")
 
@@ -45,15 +47,17 @@ classify() {
 }
 
 classify "vendored — ships as-is, no action" \
-  '^(bin|default|shell|themes|config|applications)/'
+  '^(bin|default|shell|themes|config|applications)/|^(version|logo\.[a-z]+|icon\.[a-z]+)$'
 classify "package — update packages.nix and the inventory" \
   '^install/omarchy-.*\.packages$'
 classify "script — translate into a modules/omarchy/*.nix option" \
   '^(install/(config|hardware|login|post-install|provisioning|helpers|user)/|etc/)'
 classify "ignore — not shipped, or no NixOS meaning" \
-  '^(test|manual|plans|docs|agents|migrations)/'
+  '^(test|manual|plans|docs|agents|migrations)/|^(README|CLAUDE|AGENTS)\.md$|^LICENSE$'
 
-unclassified=$(grep -vE '^(bin|default|shell|themes|config|applications|test|manual|plans|docs|agents|migrations)/|^install/|^etc/' <<<"$changed" || true)
+# Everything the four buckets above did not claim. `version` alone would otherwise land
+# here on every single release, and a warning that always fires is a warning nobody reads.
+unclassified=$(grep -vE '^(bin|default|shell|themes|config|applications|test|manual|plans|docs|agents|migrations)/|^install/|^etc/|^(version|logo\.[a-z]+|icon\.[a-z]+|LICENSE)$|^(README|CLAUDE|AGENTS)\.md$' <<<"$changed" || true)
 if [[ -n $unclassified ]]; then
   printf '=== UNCLASSIFIED — decide before committing ===\n%s\n\n' "$unclassified"
 fi
