@@ -1,0 +1,114 @@
+# CI for a public repo with no secrets configured: no cachix, no auth token, no
+# binary-cache push. Everything here has to work for a fork on the free tier.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# One run per ref. A new push makes the in-flight run pointless, and these jobs are
+# expensive enough that letting both finish wastes a lot of runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: flake check
+    runs-on: ubuntu-latest
+    # `nix flake check` evaluates every output and runs checks.session, the NixOS VM
+    # test. That is the slow part; the package build alone takes a couple of minutes.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+
+      # There is no binary cache to push to, so this only caches Nix's own evaluation
+      # and tarball cache. It saves input fetching, not builds.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/nix
+          key: nix-eval-cache-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-keys: nix-eval-cache-${{ runner.os }}-
+
+      - name: nix flake check
+        run: nix flake check --print-build-logs
+
+      - name: build the omarchy package
+        run: nix build .#omarchy --print-build-logs
+
+  format:
+    name: format and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # statix, deadnix and shellcheck come from the flake's devShell, so CI and a
+      # local `nix develop` lint with the same pinned versions.
+      - name: nix fmt --check
+        run: nix fmt -- --check .
+
+      - name: statix
+        run: nix develop --command statix check .
+
+      - name: deadnix
+        run: nix develop --command deadnix --fail .
+
+      # The shell commands are the only hand-written shell in the repo; the vendored
+      # upstream tree is not ours to lint. `--severity=warning` keeps style-only
+      # findings out of the exit code.
+      - name: shellcheck
+        run: |
+          nix develop --command bash -euo pipefail -c '
+            shopt -s nullglob
+            files=(pkgs/omarchy/commands/* scripts/*.sh)
+            if (( ${#files[@]} == 0 )); then
+              echo "nothing to shellcheck"
+              exit 0
+            fi
+            shellcheck --severity=warning "${files[@]}"
+          '
+
+  vm:
+    name: VM toplevel (heavy)
+    runs-on: ubuntu-latest
+    # Building the VM host's whole system closure pulls in Hyprland, Quickshell, SDDM
+    # and the translated package lists. On a standard 2-core hosted runner that is
+    # mostly download time, but anything nixpkgs has not cached is built here.
+    # If this job starts timing out, move it to a larger runner rather than trimming
+    # the host: the point is that the real host config still evaluates and builds.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/nix
+          key: nix-eval-cache-${{ runner.os }}-${{ hashFiles('flake.lock') }}
+          restore-keys: nix-eval-cache-${{ runner.os }}-
+
+      - name: build omarchy-vm toplevel
+        run: |
+          nix build --print-build-logs \
+            '.#nixosConfigurations.omarchy-vm.config.system.build.toplevel'

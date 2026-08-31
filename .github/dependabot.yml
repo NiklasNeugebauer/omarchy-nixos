@@ -1,0 +1,15 @@
+# Only the pinned GitHub Actions are bumped here.
+#
+# nixpkgs, home-manager, disko and the omarchy pin are flake inputs, and bumping them
+# is a reviewed operation with its own procedure — see scripts/sync-upstream.md. The
+# omarchy pin in particular has to be diffed against docs/porting-steps.md before it
+# moves, and nixpkgs bumps stay in their own commit. Dependabot cannot do either, so
+# it is deliberately not pointed at the flake.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
