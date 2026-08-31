@@ -80,6 +80,15 @@
           inherit (pkgs) omarchy;
           default = pkgs.omarchy;
         }
+        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          # Boots a VM to a rendered greeter and saves screenshots. Deliberately a package
+          # and not a check: it needs a graphics-capable VM, so CI cannot run it, but it is
+          # the only automated look at whether the desktop draws at all.
+          greeter-screenshots = pkgs.callPackage ./tests/greeter.nix {
+            inherit (self) nixosModules;
+            homeManagerModule = home-manager.nixosModules.home-manager;
+          };
+        }
       );
 
       nixosConfigurations = {
