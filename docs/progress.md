@@ -109,12 +109,26 @@ Run with a rootless Nix (nix-portable) against the pinned inputs:
   upstream version, `omarchy theme list` reads the vendored themes
 - `nix build .#checks.x86_64-linux.session` — the NixOS VM test boots a qemu VM and passes
 - `nix build .#greeter-screenshots` — boots to `graphical.target` and the greeter renders
+- `nix build .#desktop-screenshots` — autologs in, Hyprland and the Quickshell shell come up,
+  the bar and the first-run notifications render, the five generated theme files exist, and
+  nothing in the session reported a command it could not find
 - `nix flake check` — green
 - the porting-step drift guard, checked by building the package against a source tree with
   a stubbed command deleted: the build fails and names the file to edit
 
-Two real bugs were found by that verification rather than by review, both now fixed:
-linking a shipped-default config directory as a store symlink broke every app that rewrites
-its own config, and `services.displayManager.sddm.enable` does not wire
-`display-manager.service` into `graphical.target` on current nixpkgs, so the system booted
-to a text console with no greeter.
+Bugs that only a running system exposed, all fixed:
+
+- a shipped-default config directory linked as a store symlink breaks every application that
+  rewrites its own config
+- `services.displayManager.sddm.enable` does not wire `display-manager.service` into
+  `graphical.target` on current nixpkgs, so the system booted to a text console
+- the systemd user manager's PATH holds almost nothing on NixOS, so the shipped units'
+  scripts could not find `dbus-monitor` and `omarchy-sleep-lock.service` restart-looped
+- home-manager activation has its own PATH, so the initial theme switch wrote a theme name
+  and a background and rendered none of the per-application colour files
+- `XMODIFIERS=@im=fcitx` through `environment.sessionVariables` is parsed by pam_env, which
+  reads the leading `@` as an expansion sigil and drops the variable
+- `xkbcli` was missing, so the shell's keyboard-layout widget could not enumerate layouts
+
+The last four are the class porting step 7 warns about, and `.#desktop-screenshots` now fails
+on any of them: it asserts no command in a live session went unfound.

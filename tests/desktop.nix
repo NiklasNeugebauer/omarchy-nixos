@@ -90,6 +90,18 @@ pkgs.testers.runNixOSTest {
 
     print(f"OCR: {machine.get_screen_text_variants()!r}")
 
+    # --- the generated theme ----------------------------------------------------
+    # A theme name on its own proves nothing: the switcher writes that early and renders the
+    # per-application colour files afterwards, so a switcher that ran without a usable PATH
+    # leaves a named theme and no rendered files, and every application comes up unstyled
+    # while looking, from the outside, like theming worked.
+    theme_dir = "/home/omarchy/.local/state/omarchy/current/theme"
+    rendered = machine.succeed(f"ls {theme_dir}").split()
+    print(f"rendered theme files: {sorted(rendered)}")
+    for name in ("alacritty.toml", "btop.theme", "foot.ini", "hyprland.lua", "shell.toml"):
+        assert name in rendered, \
+            f"{name} was not rendered into {theme_dir}; it holds {sorted(rendered)}"
+
     # --- missing runtime tools --------------------------------------------------
     # Porting step 7 puts the tools the vendored commands shell out to in the system
     # profile rather than wrapping each command, which means a tool nobody listed fails at
