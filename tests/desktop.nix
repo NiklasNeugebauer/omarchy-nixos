@@ -5,7 +5,7 @@
 # wants a DRM device, so the VM is given a virtio GPU and Mesa is told to use its software
 # rasteriser; that is enough for the compositor to get a scene out, but it is not a GPU.
 # A bar that draws here can still fail on a real one, and nothing here judges whether it
-# looks right — that is what the checklist in CLAUDE.md is for.
+# looks right — that is what the hardware checklist in docs/progress.md is for.
 #
 # It does, however, catch the one class of bug the build cannot: a vendored command that
 # shells out to a tool nothing installed. Porting step 7 is marked "check by hand" for

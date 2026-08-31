@@ -56,7 +56,7 @@ Each phase ends with `nix flake check` green and, from phase 3 on, a VM build.
   GTK/Qt/terminal/shell all follow.
 - **Phase 8 — disks and hardware.** disko LUKS2 + btrfs subvolumes, generic laptop host.
 - **Phase 9 — tests.** `nix flake check`, a NixOS VM test asserting the session comes up, and
-  the smoke-test checklist in `CLAUDE.md` run by hand once on hardware.
+  the hardware checklist in `docs/progress.md` run by hand once on hardware.
 
 ## Non-goals
 

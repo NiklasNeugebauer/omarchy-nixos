@@ -6,7 +6,7 @@
 #
 #   nix build .#greeter-screenshots && ls result/
 #
-# This covers the first two lines of the smoke-test checklist in CLAUDE.md — the greeter
+# This covers the first two lines of the hardware checklist in docs/progress.md — the greeter
 # rendering, and the session starting behind it — under llvmpipe rather than on real
 # hardware. Everything past login still needs a person: llvmpipe is not a GPU, and a
 # Quickshell bar that renders here can still fail on a real one.

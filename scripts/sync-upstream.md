@@ -43,7 +43,8 @@ marked **check by hand**; do that now, not after the VM boots.
     nix build .#nixosConfigurations.omarchy-vm.config.system.build.vm
     ./result/bin/run-omarchy-vm-vm
 
-Then the checklist in `CLAUDE.md`. A green `nix flake check` is not a verified desktop: it
+Then the hardware checklist in `docs/progress.md`. A green `nix flake check` is not a
+verified desktop: it
 cannot see the bar, the menu or the lock screen.
 
 ## 5. Write the sync report

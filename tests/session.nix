@@ -20,7 +20,7 @@
 # WHAT THIS TEST DOES NOT COVER — a green run here is NOT a verified desktop
 #
 # Everything that needs a GPU or a pair of eyes stays in the hardware smoke-test
-# checklist in CLAUDE.md and has to be run by hand once per release: Hyprland actually
+# checklist in docs/progress.md and has to be run by hand once per release: Hyprland actually
 # starting and rendering, the Quickshell bar/menu/OSD/notifications/lock screen
 # appearing, autologin landing in a live session, theme switching taking effect across
 # GTK/Qt/terminal, audio and bluetooth devices, printing, brightness and power keys,

@@ -44,8 +44,8 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] verified visually in a VM: `nix build .#greeter-screenshots` boots to
       `graphical.target` under llvmpipe and the omarchy greeter renders — branded logo,
       lock glyph, password field, theme colours
-- [ ] **verified on hardware: logging in reaches a Hyprland session** — the checklist in
-      `CLAUDE.md` starts after the greeter, and nothing past login has been seen
+- [ ] **verified on hardware: logging in reaches a Hyprland session** — the hardware
+      checklist below starts after the greeter, and nothing past login has been seen
 
 ## Phase 4 — the shell
 
@@ -87,7 +87,32 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] `tests/session.nix`: CLI router, FHS regression, stubs, replacements, firewall
 - [x] `nix flake check` passes, VM test included
 - [x] the VM test executed to completion in a real qemu VM
-- [ ] the `CLAUDE.md` smoke-test checklist run once on hardware
+- [ ] the hardware checklist below run once on real hardware
+
+## Hardware checklist
+
+Run once per release, by a person, on a real machine. Nothing in CI can see any of it.
+
+Already covered by `nix build .#desktop-screenshots`, so a regression fails a build instead of
+waiting for someone to notice:
+
+- [x] boots to Hyprland via UWSM autologin
+- [x] Quickshell bar renders: workspaces, clock, tray, battery, volume
+- [x] notifications appear
+- [x] theme switch propagates to the background and the bar
+- [x] the generated per-application theme files exist
+- [x] no vendored command calls a tool that is not installed
+
+Still needs a person:
+
+- [ ] Super+Space unified menu opens and launches apps
+- [ ] OSD on volume and brightness keys
+- [ ] lock screen engages and unlocks
+- [ ] polkit prompt appears (e.g. `systemctl restart` something)
+- [ ] theme switch propagates to the terminal, GTK and Qt applications
+- [ ] firewall: only 22 and 53317 open (asserted in `tests/session.nix`, worth confirming live)
+- [ ] suspend and resume, with the session locked before it sleeps
+- [ ] the LUKS passphrase prompt on the encrypted host
 
 ## Known gaps
 

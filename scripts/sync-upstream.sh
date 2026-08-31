@@ -80,6 +80,6 @@ Next, by hand:
   1. Re-read docs/porting-steps.md — steps 7 to 10 are not self-verifying.
   2. nix flake check && nix build .#omarchy
   3. nix build .#nixosConfigurations.omarchy-vm.config.system.build.vm
-     ./result/bin/run-omarchy-vm-vm, then the checklist in CLAUDE.md
+     ./result/bin/run-omarchy-vm-vm, then the hardware checklist in docs/progress.md
   4. Write the sync report into the commit body.
 NEXT

@@ -103,7 +103,7 @@ inventory](docs/omarchy-package-inventory.md) says which, and what each one cost
 
 ## Contributing
 
-Read `CLAUDE.md` and `omarchy-nixos-plan.md`. The rules that matter:
+Read `AGENTS.md` and `omarchy-nixos-plan.md`. The rules that matter:
 
 - Vendor, don't fork. Divergence goes in `patches/` and is logged in `docs/divergences.md`.
 - VM build before hardware. `nix flake check` and a VM boot, every time.
