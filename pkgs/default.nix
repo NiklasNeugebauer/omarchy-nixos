@@ -3,10 +3,16 @@
 # `omarchySrc` is the pinned upstream tree from the flake input, threaded in here so the
 # overlay stays usable standalone:
 #   nixpkgs.overlays = [ (import ./pkgs { omarchySrc = <omarchy tree>; }) ];
-{ omarchySrc }:
+{
+  omarchySrc,
+  release,
+}:
 
 final: prev: {
-  omarchy = final.callPackage ./omarchy { src = omarchySrc; };
+  omarchy = final.callPackage ./omarchy {
+    src = omarchySrc;
+    inherit release;
+  };
 
   # Quickshell otherwise comes from nixpkgs unchanged: upstream omarchy pins no version, and
   # the QML modules its shell imports (Networking, Bluetooth, Services.Polkit) are all built

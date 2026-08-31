@@ -14,6 +14,7 @@ one place and is linked from here — do not restate it, or the two copies will 
 | What is done, what is unverified? | `docs/progress.md` |
 | Which nixpkgs attr replaces an Arch package? | `docs/omarchy-package-inventory.md` |
 | Which NixOS option replaces a hardware script? | `docs/omarchy-nixos-hardware.md` |
+| How are releases tracked and tagged? | `docs/releases.md` |
 
 Read `omarchy-nixos-plan.md` and `docs/porting-steps.md` before changing anything.
 
@@ -56,7 +57,10 @@ Small commits, one concern each. When a change touches an upstream package name,
 
 Two kinds, never in the same commit.
 
-**Upstream omarchy** — triggered by a new tag on basecamp/omarchy:
+**Upstream omarchy** — the pin is a release tag, so this is a deliberate move between
+releases and never a side effect of updating something else.
+`.github/workflows/upstream.yml` notices a new release daily and opens the PR that does it;
+`docs/releases.md` is the whole story. To do it by hand:
 
     ./scripts/sync-upstream.sh    # bumps the pin, then classifies the diff for you
 

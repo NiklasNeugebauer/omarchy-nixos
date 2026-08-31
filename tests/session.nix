@@ -61,9 +61,14 @@ pkgs.testers.runNixOSTest {
     machine.succeed(f"test -d {omarchy_path}")
     machine.succeed(f"test -r {omarchy_path}/version")
 
-    version = machine.succeed(f"cat {omarchy_path}/version").strip()
-    assert version == "${pkgs.omarchy.version}", \
-        f"vendored version is {version!r}, expected ${pkgs.omarchy.version}"
+    # Not compared against the package version: upstream ships "4.0.0.alpha" in that file on
+    # every 4.x release, so the two are deliberately different. What matters is that the
+    # release actually reaches the system, which is what `omarchy version` reports.
+    reported = machine.succeed("omarchy version").strip()
+    assert "${pkgs.omarchy.release.upstreamRef}" in reported, \
+        f"omarchy version says {reported!r}, which does not name the pinned upstream release"
+    assert "${pkgs.omarchy.version}" in reported, \
+        f"omarchy version says {reported!r}, which does not name this repo's version"
 
     # The router finds its siblings through `dirname "$BASH_SOURCE"`, so the command on
     # PATH has to be a symlink into the same tree $OMARCHY_PATH names. A wrapper script
@@ -116,9 +121,7 @@ pkgs.testers.runNixOSTest {
     # Same thing through the router, which proves routing as well as the command.
     machine.succeed("omarchy pkg present bash")
 
-    printed = machine.succeed("omarchy version").strip()
-    assert printed.startswith(version), \
-        f"omarchy version printed {printed!r}, expected it to start with {version!r}"
+    # `omarchy version` is asserted above, where the release is checked.
 
     # Nothing ever migrates: the system is rebuilt from its flake.
     machine.fail("omarchy-migrate --pending")

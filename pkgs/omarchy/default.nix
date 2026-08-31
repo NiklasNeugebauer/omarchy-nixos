@@ -11,6 +11,7 @@
   lib,
   stdenvNoCC,
   src,
+  release,
   bash,
   python3,
   # Kept out of the closure deliberately: the runtime tools upstream expects on PATH are
@@ -18,7 +19,9 @@
 }:
 
 let
-  version = lib.fileContents "${src}/version";
+  # The pinned upstream release, not the `version` file in the tree — that file reads
+  # "4.0.0.alpha" on every 4.x tag and so identifies nothing. See release.nix.
+  version = "${release.upstream}-${toString release.portRevision}";
   archOnly = import ./nixos-commands.nix;
   requiredPaths = import ./upstream-paths.nix;
 
@@ -39,6 +42,7 @@ let
     "omarchy-upload-log" # ditto
     "omarchy-install-gaming-retroarch" # optional installer, fails at the pkg-add stub
     "omarchy-remove-launcher-entry" # only its cleanup path touches pacman
+    "omarchy-remove-dev-env" # mise handles every language but php, whose branch is || true
     "omarchy-setup-security-fingerprint" # fprintd setup, guarded on the binary being present
   ];
 
@@ -243,7 +247,7 @@ stdenvNoCC.mkDerivation {
   # anything a future upstream release adds in a form the sed above does not match.
 
   passthru = {
-    inherit archOnly;
+    inherit archOnly release;
     upstreamRev = src.rev or "unpinned";
   };
 

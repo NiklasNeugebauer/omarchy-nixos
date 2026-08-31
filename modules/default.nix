@@ -92,6 +92,8 @@ in
   config = lib.mkIf cfg.enable {
     # `omarchy update` and `omarchy version` read these.
     environment.etc."omarchy-nixos.conf".text = ''
+      OMARCHY_NIXOS_VERSION=${cfg.package.version}
+      OMARCHY_NIXOS_UPSTREAM=${cfg.package.release.upstreamRef}
       OMARCHY_NIXOS_FLAKE=${cfg.flake}
       OMARCHY_NIXOS_REV=${
         if config.system.configurationRevision == null then "dirty" else config.system.configurationRevision

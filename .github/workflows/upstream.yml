@@ -1,0 +1,155 @@
+# Watch upstream omarchy for a new release and open the PR that adopts it.
+#
+# The pin is a release tag, so adopting a release means editing one line in flake.nix and
+# relocking. This does that, classifies the upstream diff into the buckets
+# scripts/sync-upstream.md describes, and opens a PR — it never merges. CI on the PR reports
+# whether the port still evaluates and builds; it cannot report whether the desktop still
+# works, because the VM session test needs KVM. That part is the reviewer's job, and the PR
+# body says so.
+name: upstream release
+
+on:
+  schedule:
+    # Daily. Upstream cut three releases in three weeks, so anything slower means finding out
+    # about a release from a user.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    name: check for a new release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: find the pinned and the latest release
+        id: releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pinned=$(jq -r '.nodes.omarchy.original.ref // empty' flake.lock)
+          if [[ -z $pinned ]]; then
+            echo "::error::the omarchy input is not pinned to a tag; refusing to guess"
+            exit 1
+          fi
+
+          # Newest non-prerelease. Upstream tags release candidates and betas too, and this
+          # should not open a PR for those.
+          latest=$(gh api repos/basecamp/omarchy/releases \
+            --jq 'map(select(.prerelease == false and .draft == false)) | .[0].tag_name')
+
+          echo "pinned=$pinned" >>"$GITHUB_OUTPUT"
+          echo "latest=$latest" >>"$GITHUB_OUTPUT"
+          if [[ $pinned == "$latest" ]]; then
+            echo "current=true" >>"$GITHUB_OUTPUT"
+            echo "Pinned to $pinned, which is the latest release."
+          else
+            echo "current=false" >>"$GITHUB_OUTPUT"
+            echo "Pinned to $pinned; latest release is $latest."
+          fi
+
+      - name: bump the pin
+        if: steps.releases.outputs.current == 'false'
+        run: |
+          old='${{ steps.releases.outputs.pinned }}'
+          new='${{ steps.releases.outputs.latest }}'
+          # The tag appears once, in the input URL. release.nix reads it back out of the lock.
+          sed -i "s|github:basecamp/omarchy/$old|github:basecamp/omarchy/$new|" flake.nix
+          grep -q "github:basecamp/omarchy/$new" flake.nix
+          # A new upstream release resets the packaging revision.
+          sed -i 's/^  portRevision = .*/  portRevision = 1;/' release.nix
+          nix flake update omarchy
+
+      - name: classify the upstream diff
+        if: steps.releases.outputs.current == 'false'
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          old='${{ steps.releases.outputs.pinned }}'
+          new='${{ steps.releases.outputs.latest }}'
+          changed=$(gh api "repos/basecamp/omarchy/compare/$old...$new" --jq '.files[].filename' || true)
+
+          bucket() {
+            local label=$1 pattern=$2 hit
+            hit=$(grep -E "$pattern" <<<"$changed" || true)
+            [[ -n $hit ]] || return 0
+            printf '<details><summary>%s (%s files)</summary>\n\n```\n%s\n```\n\n</details>\n\n' \
+              "$label" "$(wc -l <<<"$hit")" "$hit"
+          }
+
+          {
+            printf 'Upstream **%s → %s**.\n\n' "$old" "$new"
+            bucket 'vendored — ships as-is, but the modules reference these trees by path' \
+              '^(bin|default|shell|themes|config|applications)/|^(version|logo\.|icon\.)'
+            bucket 'package — translate into modules/omarchy/packages.nix and the inventory' \
+              '^install/omarchy-.*\.packages$'
+            bucket 'script — translate into a modules/omarchy/*.nix option (never executed)' \
+              '^(install/(config|hardware|login|post-install|provisioning|helpers|user)/|etc/)'
+            bucket 'ignore — not shipped, or no NixOS meaning' \
+              '^(test|manual|plans|docs|agents|migrations)/|^(README|CLAUDE|AGENTS)\.md$|^LICENSE$'
+            # Whatever the four buckets did not claim. Done as an inverted match rather
+            # than a negative lookahead, which grep -E does not have.
+            unclassified=$(grep -vE '^(bin|default|shell|themes|config|applications|test|manual|plans|docs|agents|migrations)/|^install/(config|hardware|login|post-install|provisioning|helpers|user)/|^install/omarchy-.*\.packages$|^etc/|^(version|logo\.|icon\.)|^(README|CLAUDE|AGENTS)\.md$|^LICENSE$' <<<"$changed" || true)
+            if [[ -n $unclassified ]]; then
+              printf '### UNCLASSIFIED — decide before merging\n\n```\n%s\n```\n\n' "$unclassified"
+            fi
+          } >diff-report.md
+
+          {
+            echo 'report<<REPORT_EOF'
+            cat diff-report.md
+            echo 'REPORT_EOF'
+          } >>"$GITHUB_OUTPUT"
+
+      - name: open the pull request
+        if: steps.releases.outputs.current == 'false'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: upstream/${{ steps.releases.outputs.latest }}
+          delete-branch: true
+          commit-message: |
+            Track omarchy ${{ steps.releases.outputs.latest }}
+
+            Bumps the pinned upstream release from
+            ${{ steps.releases.outputs.pinned }} to ${{ steps.releases.outputs.latest }}
+            and resets the packaging revision.
+          title: "Track omarchy ${{ steps.releases.outputs.latest }}"
+          labels: upstream
+          body: |
+            ${{ steps.diff.outputs.report }}
+
+            ---
+
+            ### Before merging
+
+            The build checks a lot of this for you. `pkgs/omarchy` fails the build if upstream
+            renamed a stubbed or reimplemented command, removed a path a module references,
+            renamed a lock-screen PAM service, introduced a new FHS assumption, or added a
+            command that drives pacman, the AUR, Limine or Snapper without a table entry. If
+            CI is green, none of that happened.
+
+            What CI cannot tell you:
+
+            - [ ] The **check by hand** steps in `docs/porting-steps.md`. Read them; they are
+                  the ones a bump gets wrong.
+            - [ ] `nix build .#desktop-screenshots` **locally** — CI has no KVM, so nothing
+                  here has booted a session. Look at the screenshots.
+            - [ ] A new `config/<app>/` that the application writes to needs adding to
+                  `seeded` in `modules/omarchy/home.nix`, or every write to it fails silently.
+            - [ ] A new runtime tool a vendored command shells out to needs adding to
+                  `modules/omarchy/packages.nix`. `.#desktop-screenshots` catches this, which
+                  is the other reason to run it.
+
+            After merging, tag the release: `v${{ steps.releases.outputs.latest }}`-1 —
+            see `docs/releases.md`.

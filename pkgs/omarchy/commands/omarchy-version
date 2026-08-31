@@ -2,20 +2,24 @@
 
 # omarchy:summary=Print the installed Omarchy version
 
-# The vendored upstream version, plus the omarchy-nixos revision that packaged it.
+# The upstream release this system was built from, and the packaging revision of it.
+#
+# Deliberately not $OMARCHY_PATH/version: upstream ships "4.0.0.alpha" in that file on v4.0.0,
+# v4.0.1 and v4.0.2 alike, so it cannot tell you which release you are running.
 
 set -euo pipefail
-
-omarchy_path=${OMARCHY_PATH:?OMARCHY_PATH is not set}
-version=$(< "${omarchy_path%/}/version")
 
 if [[ -r /etc/omarchy-nixos.conf ]]; then
   # shellcheck source=/dev/null
   . /etc/omarchy-nixos.conf
 fi
 
-if [[ -n ${OMARCHY_NIXOS_REV:-} ]]; then
-  echo "$version (omarchy-nixos $OMARCHY_NIXOS_REV)"
+upstream=${OMARCHY_NIXOS_UPSTREAM:-unknown}
+port=${OMARCHY_NIXOS_VERSION:-unknown}
+rev=${OMARCHY_NIXOS_REV:-}
+
+if [[ -n $rev && $rev != "dirty" ]]; then
+  echo "omarchy $upstream (omarchy-nixos $port, $rev)"
 else
-  echo "$version (omarchy-nixos)"
+  echo "omarchy $upstream (omarchy-nixos $port)"
 fi

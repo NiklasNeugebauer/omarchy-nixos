@@ -99,6 +99,12 @@ scripts to the NixOS option that replaces each one.
 
 ## Living with it
 
+This repo pins an upstream **release**, not a branch, and tags its own releases against it —
+`v4.0.2-1` is the first port of upstream `v4.0.2`. Pin a tag for a pairing that was built and
+smoke tested together, or follow `main` for whatever release has been adopted and reviewed.
+[`docs/releases.md`](docs/releases.md) has the details; a scheduled workflow opens the PR when
+upstream publishes a new release.
+
     omarchy update             # nix flake update + nixos-rebuild switch
     omarchy snapshot           # list generations
     omarchy snapshot rollback  # boot the previous one
@@ -135,6 +141,7 @@ The full account is [`docs/divergences.md`](docs/divergences.md). The short vers
     docs/porting-steps.md      what this repo does to upstream — read this one
     docs/divergences.md        where behaviour differs, and what you notice
     docs/progress.md           what is verified and what is not
+    docs/releases.md           how upstream releases are tracked and tagged
     scripts/sync-upstream.sh   bump the upstream pin and classify the diff
 
 ## Contributing

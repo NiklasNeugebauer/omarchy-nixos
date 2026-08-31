@@ -8,20 +8,31 @@ set -euo pipefail
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo"
 
-rev_of() { nix flake metadata --json | jq -r '.locks.nodes.omarchy.locked.rev'; }
+ref_of() { jq -r '.nodes.omarchy.original.ref // empty' flake.lock; }
 
-old=$(rev_of)
+old=$(ref_of)
+if [[ -z $old ]]; then
+  echo "The omarchy input is not pinned to a release tag. Fix flake.nix first:" >&2
+  echo '  omarchy.url = "github:basecamp/omarchy/vX.Y.Z";' >&2
+  exit 1
+fi
 echo "omarchy is pinned at $old"
 
-nix flake update omarchy
-new=$(rev_of)
+# Newest non-prerelease: upstream tags betas and release candidates too.
+new=$(gh api repos/basecamp/omarchy/releases \
+  --jq 'map(select(.prerelease == false and .draft == false)) | .[0].tag_name')
 
 if [[ $old == "$new" ]]; then
-  echo "Already up to date."
+  echo "Already the latest release."
   exit 0
 fi
 
-echo "Bumped to $new"
+echo "Latest release is $new; bumping."
+sed -i "s|github:basecamp/omarchy/$old|github:basecamp/omarchy/$new|" flake.nix
+grep -q "github:basecamp/omarchy/$new" flake.nix
+# A new upstream release resets the packaging revision.
+sed -i 's/^  portRevision = .*/  portRevision = 1;/' release.nix
+nix flake update omarchy
 echo
 
 # The diff comes from a throwaway clone: the flake input is a bare source tree in the store
@@ -88,4 +99,5 @@ Next, by hand:
   3. nix build .#nixosConfigurations.omarchy-vm.config.system.build.vm
      ./result/bin/run-omarchy-vm-vm, then the hardware checklist in docs/progress.md
   4. Write the sync report into the commit body.
+  5. Tag the release — see docs/releases.md.
 NEXT

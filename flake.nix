@@ -14,10 +14,18 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # The upstream desktop, consumed as a source tree. Bumped on its own, never in the
-    # same commit as nixpkgs — see scripts/sync-upstream.md.
+    # The upstream desktop, consumed as a source tree.
+    #
+    # Pinned to a release tag, not a branch. Upstream's default branch is a development line,
+    # and its release tags sit on a different line entirely — so following the default branch
+    # meant `nix flake update` pulled whatever was mid-refactor at that moment, and the port
+    # was never on a release at all. A tag is immutable, which makes moving between releases
+    # a reviewed edit to this line rather than a side effect of updating something else.
+    #
+    # Bumped on its own, never in the same commit as nixpkgs. .github/workflows/upstream.yml
+    # opens the PR that does it; scripts/sync-upstream.md is the manual form.
     omarchy = {
-      url = "github:basecamp/omarchy";
+      url = "github:basecamp/omarchy/v4.0.2";
       flake = false;
     };
   };
@@ -42,8 +50,16 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
+      # The release this checkout is, derived from the pinned tag. See release.nix.
+      release = import ./release.nix {
+        lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+      };
+
       # Our packages, as an overlay so hosts and `nix build` see the same tree.
-      overlay = import ./pkgs { omarchySrc = omarchy; };
+      overlay = import ./pkgs {
+        omarchySrc = omarchy;
+        inherit release;
+      };
 
       pkgsFor =
         system:
