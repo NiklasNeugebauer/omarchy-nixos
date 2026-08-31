@@ -41,7 +41,11 @@ Legend: `[x]` done and verified · `[~]` done, not yet verified on hardware · `
 - [x] XDG portals (hyprland + gtk), fcitx5, sleep hooks, mimeapps, xdg-terminal-exec
 - [x] verified in the VM: the greeter is wired into `graphical.target`, runs sddm with the
       omarchy theme, and the `hyprland-uwsm` session desktop file is installed
-- [ ] **verified on hardware: boots to Hyprland** — see the checklist in `CLAUDE.md`
+- [x] verified visually in a VM: `nix build .#greeter-screenshots` boots to
+      `graphical.target` under llvmpipe and the omarchy greeter renders — branded logo,
+      lock glyph, password field, theme colours
+- [ ] **verified on hardware: logging in reaches a Hyprland session** — the checklist in
+      `CLAUDE.md` starts after the greeter, and nothing past login has been seen
 
 ## Phase 4 — the shell
 
@@ -104,7 +108,10 @@ Run with a rootless Nix (nix-portable) against the pinned inputs:
   pointer, `omarchy-pkg-present` returns the right exit codes, `omarchy version` prints the
   upstream version, `omarchy theme list` reads the vendored themes
 - `nix build .#checks.x86_64-linux.session` — the NixOS VM test boots a qemu VM and passes
+- `nix build .#greeter-screenshots` — boots to `graphical.target` and the greeter renders
 - `nix flake check` — green
+- the porting-step drift guard, checked by building the package against a source tree with
+  a stubbed command deleted: the build fails and names the file to edit
 
 Two real bugs were found by that verification rather than by review, both now fixed:
 linking a shipped-default config directory as a store symlink broke every app that rewrites

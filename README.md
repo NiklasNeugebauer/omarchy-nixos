@@ -7,9 +7,12 @@ terminal-first environment, and a large CLI of `omarchy-*` commands. It is built
 This repo runs the same desktop, from the same source tree, on NixOS — declaratively, with
 atomic updates and bootable rollback.
 
-> **Status: alpha.** The system builds and evaluates, and the CLI, packaging and module layer
-> are tested in a VM. The desktop itself has not been verified on hardware. Treat it as
-> something to read and build, not something to install on a machine you need today.
+> **Status: alpha.** `nix flake check` is green, the whole system closure builds, and a NixOS
+> VM test exercises the CLI, the packaging, home-manager activation and the greeter — which
+> has been confirmed to actually render (`nix build .#greeter-screenshots`). Nothing past the
+> login screen has been seen: no Hyprland session, no Quickshell bar, nothing on hardware.
+> Treat it as something to read and build, not something to install on a machine you need
+> today.
 
 ## How it works
 

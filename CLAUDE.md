@@ -46,6 +46,9 @@ the PR/commit body: what changed upstream, what was translated, what was ignored
 ## Smoke test checklist (VM)
 
 `nix flake check` cannot see any of this. It has to be run by a human, once per release.
+The one exception is the greeter: `nix build .#greeter-screenshots` boots a VM to
+`graphical.target` and saves a screenshot of it, so that line can be checked without
+hardware.
 
 - [ ] boots to Hyprland via UWSM autologin
 - [ ] Quickshell bar renders: workspaces, clock, tray, battery, volume
