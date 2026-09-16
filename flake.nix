@@ -25,7 +25,7 @@
     # Bumped on its own, never in the same commit as nixpkgs. .github/workflows/upstream.yml
     # opens the PR that does it; scripts/sync-upstream.md is the manual form.
     omarchy = {
-      url = "github:basecamp/omarchy/v4.0.2";
+      url = "github:basecamp/omarchy/v4.0.4";
       flake = false;
     };
   };
